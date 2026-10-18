@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- doodle avatar 2: peach-to-pink hair with a top bun, dot eyes and a smile -->
+  <defs>
+    <linearGradient id="hair" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb36b"/><stop offset=".6" stop-color="#ff8a8f"/><stop offset="1" stop-color="#f9a8d4"/></linearGradient>
+  </defs>
+  <rect width="128" height="128" fill="#fff4ee"/>
+  <circle cx="60" cy="20" r="12" fill="url(#hair)"/>
+  <path d="M28 96C13 72 18 38 50 27c32-11 58 7 62 37 3 30-13 50-36 48-19-1-36-6-48-16z" fill="url(#hair)"/>
+  <path d="M40 72c6-5 20-5 31-3 11 2 16-4 18-12 9 7 15 19 12 32-3 14-17 21-33 21H55c-8-9-14-22-15-38z" fill="#fff"/>
+  <g fill="none" stroke="#0d0d0f" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M52 74c-10-1-12 15 0 17"/>
+    <path d="M74 91c5 5 13 5 18-1"/>
+    <path d="M97 64c4 15 0 31-14 37-6 3-14 3-19 2"/>
+    <path d="M67 103v10"/>
+  </g>
+  <circle cx="74" cy="78" r="3.6" fill="#0d0d0f"/>
+  <circle cx="89" cy="77" r="3.6" fill="#0d0d0f"/>
+</svg>

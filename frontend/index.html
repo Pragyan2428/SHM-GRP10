@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a0b0d" />
+    <meta name="description" content="Smart Structural Health Monitoring System - wireless ESP32 sensor nodes, real-time dashboard and automated alerts" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <title>Smart SHM System</title>
+    <script>
+      // Intro animation: plays every time the site is opened or refreshed (moving between pages
+      // inside the app does not reload, so it does not replay). Click or press a key to skip.
+      // Decided here, before anything is drawn, so the page never flashes underneath it.
+      // Automated test browsers skip it unless ?intro is in the URL, so tests are not slowed down.
+      (function () {
+        var html = document.documentElement
+        var forced = /[?&]intro\b/.test(location.search)
+        if (forced || !navigator.webdriver) html.classList.add('intro-on')
+        if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) html.classList.add('intro-reduced')
+      })()
+    </script>
+    <style>
+      #intro { display: none; }
+      html.intro-on, html.intro-on body { overflow: hidden; }
+      html.intro-on #intro {
+        display: flex; position: fixed; inset: 0; z-index: 9999; align-items: center; justify-content: center; cursor: pointer;
+        color: #eef0f3; font-family: Manrope, Inter, system-ui, sans-serif;
+        background:
+          radial-gradient(700px 420px at 50% 42%, rgba(255, 122, 26, .16), transparent 65%),
+          linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px) 0 0 / 40px 40px,
+          linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px) 0 0 / 40px 40px,
+          #08090b;
+        transition: transform .75s cubic-bezier(.76, 0, .24, 1), opacity .75s ease;
+      }
+      #intro.intro-leave { transform: translateY(-100%); }
+      #intro.intro-leave .intro-stage { opacity: 0; transform: translateY(-30px) scale(.98); }
+      .intro-stage { display: flex; flex-direction: column; align-items: center; gap: 26px; padding: 24px; transition: opacity .45s ease, transform .6s ease; }
+      .intro-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+      .intro-building { width: min(240px, 62vw); height: auto; overflow: visible; }
+      .intro-building .i-draw, .intro-building .i-ground { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 700; stroke-dashoffset: 700; animation: intro-draw .9s cubic-bezier(.65, 0, .35, 1) forwards; animation-delay: var(--d, 0s); }
+      .intro-building .i-draw { stroke: #eef0f3; stroke-width: 3; }
+      .intro-building .i-thin { stroke: rgba(238, 240, 243, .45); stroke-width: 2; }
+      .intro-building .i-ground { stroke: rgba(238, 240, 243, .35); stroke-width: 2; }
+      .intro-building .i-dot, .intro-building .i-pulse { transform-box: fill-box; transform-origin: center; }
+      .intro-building .i-dot { transform: scale(0); animation: intro-pop .45s cubic-bezier(.34, 1.56, .64, 1) forwards; animation-delay: var(--d); }
+      .intro-building .i-pulse { fill: none; stroke-width: 2; opacity: 0; animation: intro-pulse 1.4s ease-out infinite; animation-delay: var(--d); }
+      .intro-brand { display: flex; align-items: center; gap: 14px; opacity: 0; transform: translateY(14px); animation: intro-rise .7s cubic-bezier(.22, 1, .36, 1) 1.45s forwards; }
+      .intro-mark { width: 46px; height: 46px; border-radius: 13px; background: #f4f5f7; color: #0b0c0e; display: grid; place-items: center; flex-shrink: 0; }
+      .intro-name { font-size: 30px; font-weight: 800; letter-spacing: -.03em; line-height: 1; }
+      .intro-name span { color: #ff7a1a; }
+      .intro-sub { font-family: Inter, system-ui, sans-serif; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: #8b929c; margin-top: 6px; }
+      .intro-bar { width: min(260px, 64vw); height: 3px; border-radius: 3px; background: rgba(255,255,255,.08); overflow: hidden; }
+      .intro-bar span { display: block; height: 100%; width: 0; border-radius: 3px; background: linear-gradient(90deg, #ff9a4d, #ff7a1a); animation: intro-load 2.2s cubic-bezier(.4, 0, .2, 1) .2s forwards; }
+      .intro-skip { position: absolute; bottom: 22px; left: 0; right: 0; text-align: center; font-family: Inter, system-ui, sans-serif; font-size: 11.5px; color: #6f7683; letter-spacing: .04em; }
+      @keyframes intro-draw { to { stroke-dashoffset: 0; } }
+      @keyframes intro-pop { to { transform: scale(1); } }
+      @keyframes intro-pulse { 0% { opacity: .8; transform: scale(1); } 100% { opacity: 0; transform: scale(3.4); } }
+      @keyframes intro-rise { to { opacity: 1; transform: none; } }
+      @keyframes intro-load { to { width: 100%; } }
+      /* reduced motion: everything visible at once, a quick fade instead of the curtain */
+      html.intro-reduced #intro *, html.intro-reduced #intro { animation: none !important; transition: opacity .25s ease !important; }
+      html.intro-reduced .intro-building .i-draw, html.intro-reduced .intro-building .i-ground { stroke-dashoffset: 0; }
+      html.intro-reduced .intro-building .i-dot { transform: none; }
+      html.intro-reduced .intro-brand { opacity: 1; transform: none; }
+      html.intro-reduced .intro-bar span { width: 100%; }
+      html.intro-reduced #intro.intro-leave { transform: none; opacity: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <div id="intro" data-testid="intro" role="status" aria-live="polite">
+      <span class="intro-sr">Loading Smart Structural Health Monitoring System</span>
+      <div class="intro-stage" aria-hidden="true">
+        <svg class="intro-building" viewBox="0 0 220 175">
+          <line class="i-ground" x1="8" y1="162" x2="212" y2="162" />
+          <path class="i-draw" d="M58 162 V34 H162 V162" style="--d:.1s" />
+          <path class="i-draw i-thin" d="M52 66 H168 M52 98 H168 M52 130 H168" style="--d:.4s" />
+          <path class="i-draw i-thin" d="M93 34 V162 M127 34 V162" style="--d:.55s" />
+          <path class="i-draw" d="M118 34 V14 H150 V34" style="--d:.7s" />
+          <g>
+            <circle class="i-pulse" cx="74" cy="156" r="5" stroke="#2fd17a" style="--d:1.05s" />
+            <circle class="i-dot" cx="74" cy="156" r="5.5" fill="#2fd17a" style="--d:1.05s" />
+            <circle class="i-pulse" cx="110" cy="128" r="5" stroke="#2fd17a" style="--d:1.17s" />
+            <circle class="i-dot" cx="110" cy="128" r="5.5" fill="#2fd17a" style="--d:1.17s" />
+            <circle class="i-pulse" cx="76" cy="96" r="5" stroke="#2fd17a" style="--d:1.29s" />
+            <circle class="i-dot" cx="76" cy="96" r="5.5" fill="#2fd17a" style="--d:1.29s" />
+            <circle class="i-pulse" cx="146" cy="64" r="5" stroke="#2fd17a" style="--d:1.41s" />
+            <circle class="i-dot" cx="146" cy="64" r="5.5" fill="#2fd17a" style="--d:1.41s" />
+            <circle class="i-pulse" cx="134" cy="20" r="5" stroke="#ff7a1a" style="--d:1.53s" />
+            <circle class="i-dot" cx="134" cy="20" r="5.5" fill="#ff7a1a" style="--d:1.53s" />
+          </g>
+        </svg>
+        <div class="intro-brand">
+          <div class="intro-mark">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 21V4h14v17M3 21h18M9 8h2M13 8h2M9 12h2M13 12h2M10 21v-4h4v4" /></svg>
+          </div>
+          <div>
+            <div class="intro-name">Smart <span>SHM</span></div>
+            <div class="intro-sub">Structural Health Monitoring System</div>
+          </div>
+        </div>
+        <div class="intro-bar"><span></span></div>
+      </div>
+      <div class="intro-skip" aria-hidden="true">Click anywhere to skip</div>
+    </div>
+
+    <script>
+      (function () {
+        var html = document.documentElement
+        var el = document.getElementById('intro')
+        if (!html.classList.contains('intro-on')) {
+          el.remove()
+          window.shmIntro = { ready: function () {} }
+          return
+        }
+        var reduced = html.classList.contains('intro-reduced')
+        var minMs = reduced ? 600 : 2500
+        var start = Date.now()
+        var appReady = false
+        var done = false
+        function finish() {
+          if (done) return
+          done = true
+          el.classList.add('intro-leave')
+          setTimeout(function () { el.remove(); html.classList.remove('intro-on') }, reduced ? 260 : 780)
+        }
+        function maybeFinish() { if (appReady && Date.now() - start >= minMs) finish() }
+        // the app calls this once it has rendered; the intro then lifts after its minimum time
+        window.shmIntro = {
+          ready: function () {
+            appReady = true
+            setTimeout(maybeFinish, Math.max(0, minMs - (Date.now() - start)))
+          },
+        }
+        el.addEventListener('click', finish)
+        window.addEventListener('keydown', finish, { once: true })
+        setTimeout(finish, 7000) // never block the page if the app fails to start
+      })()
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

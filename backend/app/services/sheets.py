@@ -195,7 +195,7 @@ class AppsScriptClient:
         return data
 
     def ensure_sheet(self) -> None:
-        self.spreadsheet_url = self._call("setup").get("url") or self.spreadsheet_url
+        pass  # the script adds the worksheet and header row itself on every call, so skip a round trip
 
     def existing_ids(self) -> set[str]:
         return {str(i) for i in self._call("ids").get("ids", [])}
@@ -211,6 +211,7 @@ class AppsScriptClient:
             if "Unknown action" in str(exc):
                 raise SheetsError(SCRIPT_OUTDATED) from None
             raise
+        self.spreadsheet_url = data.get("url") or self.spreadsheet_url
         return int(data.get("appended", 0)), int(data.get("updated", 0))
 
 

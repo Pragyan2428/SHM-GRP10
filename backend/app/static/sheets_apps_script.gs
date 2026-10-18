@@ -51,7 +51,9 @@ function doPost(e) {
       case 'append':
         return reply({ ok: true, appended: append(sheet, body.rows || []) })
       case 'upsert':
-        return reply(upsert(sheet, body.rows || []))
+        var result = upsert(sheet, body.rows || [])
+        result.url = book().getUrl()
+        return reply(result)
       default:
         return reply({ ok: false, error: 'Unknown action' })
     }

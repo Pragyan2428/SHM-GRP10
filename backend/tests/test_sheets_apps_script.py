@@ -56,7 +56,8 @@ class FakeScript:
                     where[r[0]] = len(self.rows)
                     self.rows.append(r)
                     appended += 1
-            return self.reply({"ok": True, "appended": appended, "updated": updated})
+            return self.reply({"ok": True, "appended": appended, "updated": updated,
+                               "url": "https://docs.google.com/spreadsheets/d/abc123/edit"})
         return self.reply({"ok": False, "error": "Unknown action"})
 
     def row(self, alert_id):
@@ -100,7 +101,7 @@ def test_sync_through_apps_script_without_duplicates(script):
         r = api.post("/api/google-sheets/sync").json()  # nothing new, and nothing appended twice
         assert r["ok"] and r["synced"] == 0
         assert len(script.rows) == 2 and len(script.rows[0]) == len(sheets.HEADER)
-        assert script.calls[:2] == ["setup", "upsert"]
+        assert set(script.calls) == {"upsert"}  # one round trip per sync, no separate setup call
         st = api.get("/api/google-sheets/status").json()
         assert st["pending_rows"] == 0 and st["spreadsheet_url"].startswith("https://docs.google.com/spreadsheets/")
 

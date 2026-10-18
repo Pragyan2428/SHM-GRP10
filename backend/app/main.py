@@ -42,10 +42,13 @@ async def seed_users(settings: Settings) -> None:
             "active": True, "created_at": db.utcnow()})
 
 
-def create_app(settings: Settings | None = None, start_background: bool = True) -> FastAPI:
+def create_app(settings: Settings | None = None, start_background: bool = True, serverless: bool = False) -> FastAPI:
+    """`serverless=True` is for hosts such as Vercel that may freeze the process once a reply is sent:
+    no simulator/MQTT loops, and alert follow-up work (notifications, Google Sheets) finishes before replying."""
     settings = settings or get_settings()
     settings.validate_core()
     set_settings(settings)
+    start_background = start_background and not serverless
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -56,7 +59,8 @@ def create_app(settings: Settings | None = None, start_background: bool = True) 
         await seed_users(settings)
         app.state.simulator = Simulator(settings)
         app.state.mqtt = MqttService(settings)
-        await app.state.simulator.ensure_nodes()
+        if not serverless or settings.simulator_enabled:  # no demo nodes on a real deployment
+            await app.state.simulator.ensure_nodes()
         if start_background:
             app.state.simulator.start()
             app.state.mqtt.start()
@@ -84,6 +88,13 @@ def create_app(settings: Settings | None = None, start_background: bool = True) 
         if request.url.path.startswith("/api/"):
             response.headers.setdefault("Cache-Control", "no-store")
         return response
+
+    if serverless:
+        @app.middleware("http")
+        async def finish_background_work(request: Request, call_next):
+            response = await call_next(request)
+            await tasks.drain()  # the platform may stop the process as soon as the reply is sent
+            return response
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(request: Request, exc: RequestValidationError):

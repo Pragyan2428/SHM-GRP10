@@ -160,7 +160,7 @@ Every request must carry the secret, so the URL alone is not enough to write to 
 ## Tests
 
 ```bash
-cd backend && python -m pytest        # 90 API tests, in-memory MongoDB
+cd backend && python -m pytest        # 93 API tests, in-memory MongoDB
 ```
 
 End-to-end (Playwright, 46 tests in `frontend/e2e`):
@@ -188,6 +188,7 @@ Failures keep a trace and screenshot; `npx playwright show-report` opens the HTM
 | MongoDB persistence across an API restart | `tests/test_telemetry.py::test_data_persists_across_restart` |
 | Email/SMS failure handling, CSV export, Google Sheets sync and retry without duplicates | `tests/test_integrations.py`; CSV download in `e2e/alerts.spec.js` |
 | Google Sheets via Apps Script: secret check, retry without duplicates, rows updated on acknowledge/escalate/resolve, no lost change during a sync, old-script detection, `script.google.com`-only URLs, the real `.gs` file run under Node | `tests/test_sheets_apps_script.py` (needs `node` for the last test); setup guide and copy button in `e2e/sheets.spec.js` |
+| Vercel (serverless) mode: alert work and sheet row done before the reply, no loops or demo nodes, in-memory database refused | `tests/test_serverless.py` |
 | Profile card: avatar presets and photo upload, name and password changes | `tests/test_profile.py`; `e2e/profile.spec.js` |
 | WhatsApp via Twilio, Gmail SMTP (STARTTLS/SSL, App Password errors), per-channel on/off | `tests/test_notification_channels.py` (Twilio and SMTP are faked, no real messages) |
 | Browser notification request and delivery | `e2e/alerts.spec.js` (permission granted with `context.grantPermissions`) |
@@ -197,6 +198,30 @@ Headless Chromium pins `Notification.permission` at `"denied"` even after a gran
 init script that reports the permission from the Permissions API, which follows the grant. The app's own request and notify code runs unchanged.
 
 Every interactive element in the UI has a unique `data-testid`, which the Playwright suite selects on.
+
+## Deploying on Vercel
+
+`vercel.json` deploys both parts as one Vercel project, using [Vercel Services](https://vercel.com/docs/services):
+- The **frontend** service is the Vite build, served at `/`. Page routes such as `/user` fall back to `index.html`.
+- The **backend** service is the API, served at `/api` (the API receives the full `/api/...` path). Its entry point is `backend/index.py`, which builds the app with `create_app(serverless=True)`:
+  - The simulator and MQTT loops don't start.
+  - Demo nodes are only created when `SIMULATOR_ENABLED=true`.
+  - Every request waits for its follow-up work (email, SMS, WhatsApp, Google Sheets row) before replying, because Vercel may freeze the function once a reply is sent.
+
+Both parts share one domain, so the login cookie stays first-party and `VITE_API_BASE` stays empty.
+
+1. Create a free **MongoDB Atlas** cluster and a database user. Under **Network Access**, allow `0.0.0.0/0` (Vercel has no fixed IP addresses), then copy the `mongodb+srv://...` connection string.
+2. In Vercel, import the repository. Keep **Root Directory** `./` and the multi-service preset (backend `/api`, frontend `/`).
+3. In **Environment Variables**, paste the contents of `backend/.env`, then change these:
+   - `MONGO_URL` → the Atlas string
+   - `COOKIE_SECURE` → `true`
+   - `FRONTEND_URL` → `https://<project>.vercel.app`
+   - `SIMULATOR_ENABLED` → `false`
+
+   `backend/index.py` refuses to start on Vercel with `mongomock://`, because that database lives in memory and would be lost between requests.
+4. Deploy. Then point the ESP32 (`API_URL` in `secrets.h`) or `tools/dummy_esp32.py --url` at `https://<project>.vercel.app/api/ingest`. The sketch accepts `https://` URLs and waits up to 20 s for a reply.
+
+The first request after a quiet period starts a new function and can take a few seconds. The admin account from `ADMIN_EMAIL` / `ADMIN_PASSWORD` is created in the new database on that first start.
 
 ## Production notes
 

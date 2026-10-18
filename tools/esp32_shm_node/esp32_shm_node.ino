@@ -161,7 +161,7 @@ void sendReading() {
     return;
   }
   HTTPClient http;
-  http.setTimeout(5000);
+  http.setTimeout(20000);  // a cloud host (e.g. Vercel) can take a few seconds after a pause
   http.begin(API_URL);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-Device-Key", DEVICE_KEY);

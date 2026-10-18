@@ -101,6 +101,7 @@ assert.strictEqual(sheet.cells[4][3], 700) // numbers stay numbers
 r = post({ action: 'upsert', secret, worksheet: 'SHM Alerts',
   rows: [row('ALT-2', 'Ground floor', 'acknowledged', 'Admin (admin@example.com)'), row('ALT-5'), row('ALT-5', 'Roof'), ['short']] })
 assert.deepStrictEqual([r.ok, r.appended, r.updated], [true, 1, 1])
+assert.strictEqual(r.url, 'https://docs.google.com/spreadsheets/d/abc123/edit')
 assert.strictEqual(sheet.cells.length, 6) // header + ALT-1..ALT-5, nothing duplicated
 assert.strictEqual(sheet.cells[2][0], 'ALT-2')
 assert.strictEqual(sheet.cells[2][10], 'acknowledged')

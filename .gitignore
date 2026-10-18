@@ -13,3 +13,6 @@ __pycache__/
 frontend/test-results/
 frontend/playwright-report/
 tools/esp32_shm_node/secrets.h
+# deploy / local tooling
+.vercel/
+frontend/.shots/

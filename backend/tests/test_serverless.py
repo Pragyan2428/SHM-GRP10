@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from app import db
 from app.main import create_app
 from app.services import sheets
 
@@ -46,8 +47,36 @@ def test_no_simulator_loop_and_no_demo_nodes(monkeypatch):
         assert [n["node_id"] for n in api.get("/api/nodes").json()["items"]] == ["ESP32-REAL"]
 
 
+def _entry_point_health(**env) -> str:
+    """Import backend/index.py the way Vercel does and call /api/health; returns 'status json'."""
+    code = ("import json, index; from fastapi.testclient import TestClient\n"
+            "with TestClient(index.app) as c:\n"
+            "    r = c.get('/api/health'); print(r.status_code, json.dumps(r.json()))")
+    out = subprocess.run([sys.executable, "-c", code], cwd=BACKEND, env={**os.environ, "VERCEL": "1", **env},
+                         capture_output=True, text=True, timeout=120)
+    assert out.returncode == 0, out.stderr
+    return out.stdout.strip().splitlines()[-1]
+
+
 def test_vercel_entry_point_refuses_the_in_memory_database():
-    env = {**os.environ, "VERCEL": "1", "MONGO_URL": "mongomock://", "JWT_SECRET": "x" * 40}
-    out = subprocess.run([sys.executable, "-c", "import index"], cwd=BACKEND, env=env,
-                         capture_output=True, text=True, timeout=60)
-    assert out.returncode != 0 and "MongoDB Atlas" in out.stderr
+    out = _entry_point_health(MONGO_URL="mongomock://", JWT_SECRET="x" * 40)
+    assert out.startswith("503") and "MongoDB Atlas" in out
+
+
+def test_vercel_entry_point_reports_a_missing_setting():
+    out = _entry_point_health(MONGO_URL="mongodb://db.invalid:27017", JWT_SECRET="too-short")
+    assert out.startswith("503") and "JWT_SECRET" in out
+
+
+def test_a_failed_database_start_is_explained_without_the_password(monkeypatch):
+    async def bad_auth(settings):
+        raise RuntimeError("bad auth : authentication failed for mongodb+srv://shm_user:S3cretPass@cluster0.x.mongodb.net/")
+
+    monkeypatch.setattr(db, "connect", bad_auth)
+    with _serverless() as c:
+        r = c.get("/api/health")
+        assert r.status_code == 503 and r.json()["ok"] is False
+        error = r.json()["error"]
+        assert "password in MONGO_URL is wrong" in error and "authentication failed" in error
+        assert "S3cretPass" not in error and "shm_user:****@" in error
+        assert c.post("/api/ingest", json={}).status_code == 503  # every API path explains, none crashes

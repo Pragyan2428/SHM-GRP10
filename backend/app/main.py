@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -42,6 +43,23 @@ async def seed_users(settings: Settings) -> None:
             "active": True, "created_at": db.utcnow()})
 
 
+STARTUP_HINTS = [  # (text in the error, what to check)
+    ("authentication failed", "The username or password in MONGO_URL is wrong (Atlas > Database Access)."),
+    ("bad auth", "The username or password in MONGO_URL is wrong (Atlas > Database Access)."),
+    ("dns", "The cluster address in MONGO_URL is wrong - copy the link again from Atlas > Connect > Drivers."),
+    ("timed out", "Atlas could not be reached - allow 0.0.0.0/0 in Atlas > Network Access and check the cluster is running."),
+    ("serverselectiontimeout", "Atlas could not be reached - allow 0.0.0.0/0 in Atlas > Network Access and check the cluster is running."),
+    ("invalid uri", "MONGO_URL is not a valid MongoDB link."),
+]
+
+
+def describe_startup_error(exc: Exception) -> str:
+    """One readable line for /api/health, with any password in a connection string hidden."""
+    text = re.sub(r"://([^:/@\s]+):([^@\s]+)@", r"://\1:****@", f"{exc.__class__.__name__}: {exc}")[:600]
+    hint = next((h for needle, h in STARTUP_HINTS if needle in text.lower()), None)
+    return f"API could not start. {hint + ' ' if hint else ''}Details: {text}"
+
+
 def create_app(settings: Settings | None = None, start_background: bool = True, serverless: bool = False) -> FastAPI:
     """`serverless=True` is for hosts such as Vercel that may freeze the process once a reply is sent:
     no simulator/MQTT loops, and alert follow-up work (notifications, Google Sheets) finishes before replying."""
@@ -54,13 +72,21 @@ def create_app(settings: Settings | None = None, start_background: bool = True, 
     async def lifespan(app: FastAPI):
         pipeline.reset_locks()
         sheets.reset_lock()
-        await db.connect(settings)
-        await seed_thresholds()
-        await seed_users(settings)
         app.state.simulator = Simulator(settings)
         app.state.mqtt = MqttService(settings)
-        if not serverless or settings.simulator_enabled:  # no demo nodes on a real deployment
-            await app.state.simulator.ensure_nodes()
+        app.state.startup_error = None
+        try:
+            await db.connect(settings)
+            await seed_thresholds()
+            await seed_users(settings)
+            if not serverless or settings.simulator_enabled:  # no demo nodes on a real deployment
+                await app.state.simulator.ensure_nodes()
+        except Exception as exc:
+            if not serverless:
+                raise
+            # A host like Vercel would only say FUNCTION_INVOCATION_FAILED; /api/* reports the reason instead.
+            log.exception("API startup failed")
+            app.state.startup_error = describe_startup_error(exc)
         if start_background:
             app.state.simulator.start()
             app.state.mqtt.start()
@@ -90,6 +116,13 @@ def create_app(settings: Settings | None = None, start_background: bool = True, 
         return response
 
     if serverless:
+        @app.middleware("http")
+        async def report_startup_error(request: Request, call_next):
+            error = getattr(request.app.state, "startup_error", None)
+            if error and request.url.path.startswith("/api/"):
+                return JSONResponse(status_code=503, content={"ok": False, "error": error})
+            return await call_next(request)
+
         @app.middleware("http")
         async def finish_background_work(request: Request, call_next):
             response = await call_next(request)

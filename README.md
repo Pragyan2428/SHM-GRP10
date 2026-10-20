@@ -32,7 +32,7 @@ npm install
 npm run dev                  # http://localhost:5173, /api is proxied to :8000
 ```
 
-For plain-http local development, set `COOKIE_SECURE=false`. The first start seeds the administrator from `ADMIN_EMAIL`/`ADMIN_PASSWORD`. That only happens while the users collection is empty. To get a demo viewer, also set `SEED_VIEWER_EMAIL`/`SEED_VIEWER_PASSWORD`.
+For plain-http local development, set `COOKIE_SECURE=false`. The first start seeds the administrator from `ADMIN_EMAIL`/`ADMIN_PASSWORD`. That only happens while no admin account exists, so later changes to those two settings do nothing on their own. To change the admin email, recover a forgotten admin password or unlock a locked-out admin, set `ADMIN_RESET=true` and restart (or redeploy). `ADMIN_EMAIL` then becomes an admin whose password is exactly `ADMIN_PASSWORD`. Log in, then remove `ADMIN_RESET`, or the password is reset on every start. To get a demo viewer, also set `SEED_VIEWER_EMAIL`/`SEED_VIEWER_PASSWORD`.
 
 **Intro and sign-in.** Opening or refreshing the site plays a short intro (a building draws itself, sensor nodes light up, then the page is revealed); click or press a key to skip it. Automated test browsers skip it unless `?intro` is in the URL. Login and Sign up share one card: switching slides the orange panel across while the forms slide and fade, and phones slide the forms sideways.
 
@@ -52,7 +52,7 @@ All secrets come from environment variables. None are hard-coded, and none are s
 | Area | Variables |
 |---|---|
 | Core | `MONGO_URL`, `DB_NAME`, `JWT_SECRET` (≥32 chars), `JWT_EXPIRE_MINUTES`, `FRONTEND_URL` (explicit CORS origins), `COOKIE_SECURE`, `COOKIE_SAMESITE`, `STRUCTURE_NAME` |
-| Accounts | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`, `SEED_VIEWER_*`, `ALLOW_SIGNUP` (default `true`), `SIGNUP_EMAIL_DOMAIN` (default `gmail.com`), `LOGIN_MAX_ATTEMPTS`, `LOGIN_WINDOW_MINUTES`, `LOGIN_LOCKOUT_MINUTES` |
+| Accounts | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`, `ADMIN_RESET` (see above), `SEED_VIEWER_*`, `ALLOW_SIGNUP` (default `true`), `SIGNUP_EMAIL_DOMAIN` (default `gmail.com`), `LOGIN_MAX_ATTEMPTS`, `LOGIN_WINDOW_MINUTES`, `LOGIN_LOCKOUT_MINUTES` |
 | Telemetry | `SIMULATOR_ENABLED`, `SIMULATOR_INTERVAL_SECONDS` (5), `NODE_OFFLINE_SECONDS` (30), `READING_RETENTION_DAYS` (TTL index) |
 | Devices | `DEVICE_SHARED_KEY` or `DEVICE_KEYS=ESP32-01:key1,ESP32-02:key2` |
 | Email | `EMAIL_PROVIDER` (`smtp`/`resend`/`sendgrid`), `EMAIL_FROM`; SMTP: `SMTP_HOST` (default `smtp.gmail.com`), `SMTP_PORT` (587, or 465 for SSL), `SMTP_USERNAME`, `SMTP_PASSWORD`; Resend/SendGrid: `EMAIL_API_KEY` |
@@ -160,7 +160,7 @@ Every request must carry the secret, so the URL alone is not enough to write to 
 ## Tests
 
 ```bash
-cd backend && python -m pytest        # 97 API tests, in-memory MongoDB
+cd backend && python -m pytest        # 101 API tests, in-memory MongoDB
 ```
 
 End-to-end (Playwright, 47 tests in `frontend/e2e`):

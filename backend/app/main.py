@@ -34,12 +34,28 @@ async def _insert_seed(users, doc: dict) -> bool:
         return False
 
 
+async def reset_admin(settings: Settings) -> None:
+    """ADMIN_RESET=true: ADMIN_EMAIL becomes an active admin whose password is exactly ADMIN_PASSWORD."""
+    users = db.get_db().users
+    email = settings.admin_email.strip().lower()
+    changes = {"role": "admin", "active": True, "password_hash": hash_password(settings.admin_password)}
+    if (await users.update_one({"email": email}, {"$set": changes})).matched_count == 0:
+        await _insert_seed(users, {"id": db.new_id("usr_"), "email": email, "name": settings.admin_name,
+                                   "created_at": db.utcnow(), **changes})
+    await db.get_db().login_attempts.delete_one({"key": f"user:{email}"})  # lift a lockout from earlier tries
+    log.warning("ADMIN_RESET is on: %s is an admin with the password from ADMIN_PASSWORD. "
+                "Remove ADMIN_RESET once you can log in, or the password is reset on every start.", email)
+
+
 async def seed_users(settings: Settings) -> None:
     users = db.get_db().users
-    if await users.count_documents({}) == 0:
-        if not (settings.admin_email and settings.admin_password):
-            log.error("No users exist and ADMIN_EMAIL/ADMIN_PASSWORD are not set - nobody can log in. "
-                      "Set them in backend/.env and restart.")
+    have_login = bool(settings.admin_email and settings.admin_password)
+    if settings.admin_reset and have_login:
+        await reset_admin(settings)
+    elif await users.count_documents({"role": "admin"}) == 0:
+        if not have_login:
+            log.error("No admin account exists and ADMIN_EMAIL/ADMIN_PASSWORD are not set - nobody can manage "
+                      "the system. Set them in backend/.env (or the host's environment variables) and restart.")
             return
         if await _insert_seed(users, {
                 "id": db.new_id("usr_"), "email": settings.admin_email.lower(), "name": settings.admin_name,

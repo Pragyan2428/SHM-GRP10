@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     admin_email: Optional[str] = Field(default=None, alias="ADMIN_EMAIL")
     admin_password: Optional[str] = Field(default=None, alias="ADMIN_PASSWORD")
     admin_name: str = Field(default="System Administrator", alias="ADMIN_NAME")
+    # true: on start, make ADMIN_EMAIL an admin with exactly ADMIN_PASSWORD (to recover or change the admin login)
+    admin_reset: bool = Field(default=False, alias="ADMIN_RESET")
     seed_viewer_email: Optional[str] = Field(default=None, alias="SEED_VIEWER_EMAIL")
     seed_viewer_password: Optional[str] = Field(default=None, alias="SEED_VIEWER_PASSWORD")
 

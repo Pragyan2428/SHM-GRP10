@@ -45,8 +45,10 @@ export async function api(path, { method = 'GET', body, query, raw = false, sign
   if (!res.ok) {
     let data = null
     try { data = await res.json() } catch { /* non-JSON */ }
-    const msg = (data && (typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail))) ||
-      `Request failed (HTTP ${res.status})`
+    // FastAPI errors carry `detail`; a server that could not start says why in `error`
+    const detail = data && (typeof data.detail === 'string' ? data.detail
+      : data.detail ? JSON.stringify(data.detail) : data.error)
+    const msg = detail || `Request failed (HTTP ${res.status})`
     throw new ApiError(res.status, msg, data)
   }
   if (raw) return res

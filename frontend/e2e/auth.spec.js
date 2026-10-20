@@ -88,3 +88,14 @@ test.describe('user role', () => {
     await expect(page).toHaveURL(/\/login$/)
   })
 })
+
+test('if the server could not start, the login page says why', async ({ page }) => {
+  const reason = 'API could not start. The username or password in MONGO_URL is wrong (Atlas > Database Access).'
+  await page.route('**/api/auth/login', (route) =>
+    route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ ok: false, error: reason }) }))
+  await page.goto('/login')
+  await page.getByTestId('login-email-input').fill('someone@gmail.com')
+  await page.getByTestId('login-password-input').fill('whatever-123')
+  await page.getByTestId('login-submit-button').click()
+  await expect(page.getByTestId('login-error-message')).toContainText('password in MONGO_URL is wrong')
+})

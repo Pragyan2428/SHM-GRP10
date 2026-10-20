@@ -1,14 +1,17 @@
 """Smart Structural Health Monitoring System API."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pymongo.errors import DuplicateKeyError
 
 from . import db
 from .config import Settings, get_settings, set_settings
@@ -23,6 +26,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger("shm")
 
 
+async def _insert_seed(users, doc: dict) -> bool:
+    try:
+        await users.insert_one(doc)
+        return True
+    except DuplicateKeyError:  # another API instance starting at the same moment seeded it first
+        return False
+
+
 async def seed_users(settings: Settings) -> None:
     users = db.get_db().users
     if await users.count_documents({}) == 0:
@@ -30,14 +41,14 @@ async def seed_users(settings: Settings) -> None:
             log.error("No users exist and ADMIN_EMAIL/ADMIN_PASSWORD are not set - nobody can log in. "
                       "Set them in backend/.env and restart.")
             return
-        await users.insert_one({
-            "id": db.new_id("usr_"), "email": settings.admin_email.lower(), "name": settings.admin_name,
-            "role": "admin", "password_hash": hash_password(settings.admin_password),
-            "active": True, "created_at": db.utcnow()})
-        log.info("Seeded administrator %s", settings.admin_email)
+        if await _insert_seed(users, {
+                "id": db.new_id("usr_"), "email": settings.admin_email.lower(), "name": settings.admin_name,
+                "role": "admin", "password_hash": hash_password(settings.admin_password),
+                "active": True, "created_at": db.utcnow()}):
+            log.info("Seeded administrator %s", settings.admin_email)
     if settings.seed_viewer_email and settings.seed_viewer_password and \
             not await users.find_one({"email": settings.seed_viewer_email.lower()}):
-        await users.insert_one({
+        await _insert_seed(users, {
             "id": db.new_id("usr_"), "email": settings.seed_viewer_email.lower(), "name": "Viewer",
             "role": "viewer", "password_hash": hash_password(settings.seed_viewer_password),
             "active": True, "created_at": db.utcnow()})
@@ -60,13 +71,28 @@ def describe_startup_error(exc: Exception) -> str:
     return f"API could not start. {hint + ' ' if hint else ''}Details: {text}"
 
 
-def create_app(settings: Settings | None = None, start_background: bool = True, serverless: bool = False) -> FastAPI:
+def create_app(settings: Settings | None = None, start_background: bool = True, serverless: bool = False,
+               startup_retry_seconds: float = 10) -> FastAPI:
     """`serverless=True` is for hosts such as Vercel that may freeze the process once a reply is sent:
-    no simulator/MQTT loops, and alert follow-up work (notifications, Google Sheets) finishes before replying."""
+    no simulator/MQTT loops, and alert follow-up work (notifications, Google Sheets) finishes before replying.
+    If startup fails there, /api/* explains why and startup is retried (at most every `startup_retry_seconds`)."""
     settings = settings or get_settings()
     settings.validate_core()
     set_settings(settings)
     start_background = start_background and not serverless
+
+    async def start(app: FastAPI) -> None:
+        await db.connect(settings)
+        await seed_thresholds()
+        await seed_users(settings)
+        if not serverless or settings.simulator_enabled:  # no demo nodes on a real deployment
+            await app.state.simulator.ensure_nodes()
+
+    def startup_failed(app: FastAPI, exc: Exception) -> None:
+        # A host like Vercel would only say FUNCTION_INVOCATION_FAILED; /api/* reports the reason instead.
+        log.exception("API startup failed")
+        app.state.startup_error = describe_startup_error(exc)
+        app.state.startup_failed_at = time.monotonic()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -76,17 +102,11 @@ def create_app(settings: Settings | None = None, start_background: bool = True, 
         app.state.mqtt = MqttService(settings)
         app.state.startup_error = None
         try:
-            await db.connect(settings)
-            await seed_thresholds()
-            await seed_users(settings)
-            if not serverless or settings.simulator_enabled:  # no demo nodes on a real deployment
-                await app.state.simulator.ensure_nodes()
+            await start(app)
         except Exception as exc:
             if not serverless:
                 raise
-            # A host like Vercel would only say FUNCTION_INVOCATION_FAILED; /api/* reports the reason instead.
-            log.exception("API startup failed")
-            app.state.startup_error = describe_startup_error(exc)
+            startup_failed(app, exc)
         if start_background:
             app.state.simulator.start()
             app.state.mqtt.start()
@@ -116,11 +136,23 @@ def create_app(settings: Settings | None = None, start_background: bool = True, 
         return response
 
     if serverless:
+        retry_lock = asyncio.Lock()
+
         @app.middleware("http")
         async def report_startup_error(request: Request, call_next):
-            error = getattr(request.app.state, "startup_error", None)
-            if error and request.url.path.startswith("/api/"):
-                return JSONResponse(status_code=503, content={"ok": False, "error": error})
+            state = request.app.state
+            if getattr(state, "startup_error", None) and request.url.path.startswith("/api/"):
+                async with retry_lock:  # e.g. the database was briefly unreachable: try starting again
+                    if state.startup_error and time.monotonic() - state.startup_failed_at >= startup_retry_seconds:
+                        try:
+                            await db.disconnect()
+                            await start(request.app)
+                            state.startup_error = None
+                            log.info("API started on retry")
+                        except Exception as exc:  # noqa: BLE001
+                            startup_failed(request.app, exc)
+                if state.startup_error:
+                    return JSONResponse(status_code=503, content={"ok": False, "error": state.startup_error})
             return await call_next(request)
 
         @app.middleware("http")

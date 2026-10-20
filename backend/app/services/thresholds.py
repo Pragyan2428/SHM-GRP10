@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Optional
 
+from pymongo.errors import DuplicateKeyError
+
 from ..db import get_db, utcnow
 
 # The three sensors on each node (project hardware): HX711 strain gauge amplifier,
@@ -47,7 +49,10 @@ def default_doc(param: str) -> dict:
 async def seed_thresholds() -> None:
     for p in PARAMETERS:
         if not await get_db().thresholds.find_one({"parameter": p}):
-            await get_db().thresholds.insert_one(default_doc(p))
+            try:
+                await get_db().thresholds.insert_one(default_doc(p))
+            except DuplicateKeyError:
+                pass  # another API instance starting at the same moment seeded it first
     invalidate()
 
 

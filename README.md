@@ -139,6 +139,12 @@ WhatsApp only lets a business send free-form messages within 24 hours of the rec
 3. Open your new bot in Telegram and press **Start** (a bot may only message people who have started it).
 4. On **Notifications**, click **Find my chat**, then **Add** next to your name, then **Save settings**, then **Send test Telegram**.
 
+**Each user's own alerts.** A user is alerted about **their own** nodes. The **My alerts** card on their readings page offers:
+- **Email** to the address they signed up with. This needs the site's email sender (above); the user can switch it off.
+- **Telegram:** **Connect Telegram** opens the site's bot through a personal link. After they press **Start**, their account is linked automatically; **Disconnect** undoes it.
+
+The same minimum severity and cooldown apply as for the admin. Users can also rename their building (click the name under **Your building**); the admin sees it on the **Users** page.
+
 Alerts at or above the minimum severity are sent to every chat ID listed, with the same text as the email. Group chats work too: add the bot to the group and send a message in it, then use **Find my chat**.
 
 ## Google Sheets
@@ -182,10 +188,10 @@ Every request must carry the secret, so the URL alone is not enough to write to 
 ## Tests
 
 ```bash
-cd backend && python -m pytest        # 137 API tests, in-memory MongoDB
+cd backend && python -m pytest        # 148 API tests, in-memory MongoDB
 ```
 
-End-to-end (Playwright, 49 tests in `frontend/e2e`):
+End-to-end (Playwright, 53 tests in `frontend/e2e`):
 
 ```bash
 cd frontend

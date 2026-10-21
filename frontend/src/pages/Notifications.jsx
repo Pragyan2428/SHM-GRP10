@@ -101,10 +101,18 @@ export default function Notifications() {
       setFinding(false)
     }
   }
-  const addChat = (id) => setForm((f) => {
-    const have = lines(f.telegram_recipients)
-    return have.includes(id) ? f : { ...f, telegram_recipients: [...have, id].join('\n') }
-  })
+  // Adding a chat saves it straight away, so it can't be lost by forgetting Save.
+  const addChat = async (chat) => {
+    const list = lines(form.telegram_recipients)
+    if (list.includes(chat.id)) { push({ kind: 'info', title: `${chat.name} is already added` }); return }
+    try {
+      await api('/api/notifications/settings', { method: 'PUT', body: { telegram_recipients: [...list, chat.id] } })
+      setForm((f) => ({ ...f, telegram_recipients: [...list, chat.id].join('\n') }))
+      push({ kind: 'success', title: `Added ${chat.name}`, body: 'Telegram alerts will go to this chat. Send a test to check.', testid: 'notifications-telegram-added-toast' })
+    } catch (e) {
+      push({ kind: 'error', title: 'Could not add the chat', body: e.message })
+    }
+  }
 
   const testBrowser = async () => {
     let p = permission
@@ -191,9 +199,11 @@ export default function Notifications() {
               {chats.chats.map((c) => (
                 <div key={c.id} className="row" style={{ justifyContent: 'space-between' }}>
                   <span className="small">{c.name}{c.username ? <span className="dim"> @{c.username}</span> : null} <span className="mono dim">{c.id}</span></span>
-                  <button type="button" className="btn btn-sm" onClick={() => addChat(c.id)} data-testid={`notifications-telegram-add-${c.id}`}>
-                    <Plus size={13} aria-hidden="true" /> Add
-                  </button>
+                  {lines(form.telegram_recipients).includes(c.id) ? <span className="small c-nominal">Added ✓</span> : (
+                    <button type="button" className="btn btn-sm" onClick={() => addChat(c)} data-testid={`notifications-telegram-add-${c.id}`}>
+                      <Plus size={13} aria-hidden="true" /> Add
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

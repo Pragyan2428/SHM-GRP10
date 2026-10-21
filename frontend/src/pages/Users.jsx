@@ -100,7 +100,7 @@ export default function Users() {
       <section className="panel">
         {data.items.length === 0 ? <EmptyState title="No users" testid="users-empty-state" /> : (
           <table className="data responsive" data-testid="users-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Nodes</th><th>Last login</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Building</th><th>Nodes</th><th>Last login</th><th>Actions</th></tr></thead>
             <tbody>
               {data.items.map((u) => (
                 <tr key={u.id} data-testid={`user-row-${slug(u.email)}`}>
@@ -111,6 +111,7 @@ export default function Users() {
                   <td data-label="Email" className="mono break">{u.email}</td>
                   <td data-label="Role"><Badge value={u.role} label={u.role === 'admin' ? 'Administrator' : 'Viewer'} /></td>
                   <td data-label="Status"><Badge value={u.active ? 'online' : 'inactive'} label={u.active ? 'Active' : 'Inactive'} /></td>
+                  <td data-label="Building" data-testid={`user-building-name-${slug(u.email)}`}>{u.building_name || <span className="dim">—</span>}</td>
                   <td data-label="Nodes" className="num" data-testid={`user-node-count-${slug(u.email)}`}>{u.node_count ?? 0}</td>
                   <td data-label="Last login" className="num">{u.last_login_at ? fmtDateTime(u.last_login_at) : 'Never'}</td>
                   <td data-label="Actions">

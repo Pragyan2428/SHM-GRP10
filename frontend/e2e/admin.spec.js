@@ -107,3 +107,27 @@ test('Telegram is offered as a notification channel', async ({ page }) => {
   await expect(page.getByTestId('notifications-telegram-find-button')).toBeDisabled()
   await expect(page.getByTestId('notifications-telegram-recipients-input')).toBeVisible()
 })
+
+test('a user names their building and sees their alert options; the admin sees the name', async ({ page, browser }) => {
+  await login(page, ADMIN)
+  const owner = await newViewer(page, 'Named Owner')
+  const ctx = await browser.newContext()
+  const user = await ctx.newPage()
+  await login(user, { email: owner.email, password: 'Viewer-pass-2026' })
+  await expect(user.getByTestId('ud-building-name')).toHaveText('My building')
+  await user.getByTestId('ud-building-name').click()
+  await user.getByTestId('ud-building-name-input').fill('Hostel Block C')
+  await user.getByTestId('ud-building-name-save').click()
+  await expect(user.getByTestId('ud-building-name')).toHaveText('Hostel Block C')
+  const alerts = user.getByTestId('my-alerts')
+  await expect(alerts).toBeVisible()
+  await expect(alerts.getByTestId('my-alerts-email')).toContainText('Not set up on this site yet') // no mail sender in tests
+  await expect(alerts.getByTestId('my-alerts-telegram')).toContainText('Not set up on this site yet')
+  await ctx.close()
+
+  await page.goto('/users')
+  const slugged = owner.email.replace(/[^a-z0-9]+/g, '-')
+  await expect(page.getByTestId(`user-building-name-${slugged}`)).toHaveText('Hostel Block C')
+  await page.getByTestId(`user-building-button-${slugged}`).click()
+  await expect(page.getByTestId('page-title')).toHaveText('Hostel Block C')
+})

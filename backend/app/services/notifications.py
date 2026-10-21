@@ -228,6 +228,43 @@ async def find_telegram_chats() -> dict:
     return {"ok": True, "chats": list(chats.values()), "message": message}
 
 
+_bot_usernames: dict[str, str] = {}
+
+
+async def telegram_bot_username() -> str:
+    """The bot's @username (for t.me links), asked from Telegram once per token."""
+    token = get_settings().telegram_bot_token or ""
+    if token in _bot_usernames:
+        return _bot_usernames[token]
+    async with _http_client() as client:
+        r = await client.get(_telegram_url("getMe"))
+    try:
+        data = r.json()
+    except ValueError:
+        data = {}
+    if r.status_code >= 300 or not data.get("ok"):
+        raise NotificationError(f"Telegram: {data.get('description') or f'HTTP {r.status_code}'}")
+    _bot_usernames[token] = data["result"]["username"]
+    return _bot_usernames[token]
+
+
+async def find_start_code(code: str) -> Optional[dict]:
+    """The chat that pressed Start through a personal t.me/<bot>?start=<code> link, if any."""
+    async with _http_client() as client:
+        r = await client.get(_telegram_url("getUpdates"))
+    try:
+        data = r.json()
+    except ValueError:
+        return None
+    for update in reversed(data.get("result", []) if data.get("ok") else []):
+        msg = update.get("message") or {}
+        if (msg.get("text") or "").strip() == f"/start {code}" and "id" in (msg.get("chat") or {}):
+            chat = msg["chat"]
+            name = " ".join(x for x in (chat.get("first_name"), chat.get("last_name")) if x) or chat.get("username") or str(chat["id"])
+            return {"id": str(chat["id"]), "name": name}
+    return None
+
+
 async def _send(channel: str, recipients: list[str], subject: str, body: str) -> None:
     # Looked up at call time so tests can replace send_email / send_sms / send_whatsapp / send_telegram.
     if channel == "email":
@@ -300,10 +337,57 @@ async def dispatch_alert(alert_id: str) -> dict:
     subject, body = format_message(alert)
     channels = {c: await _channel(alert, c, cfg, subject, body, bool(recent)) for c in CHANNELS}
     status = overall_status(channels)
+    owner = await _owner_alerts(alert, cfg, subject, body, since)
     # the alert's Google Sheets row may already exist (another sync ran first), so mark it for an update
-    await db.alert_events.update_one({"id": alert_id},
-                                     row_changed({"notifications": channels, "notification_status": status}))
-    return {"notification_status": status, "notifications": channels}
+    await db.alert_events.update_one({"id": alert_id}, row_changed({
+        "notifications": channels, "notification_status": status,
+        "owner_notifications": owner, "owner_notification_status": overall_status(owner) if owner else None}))
+    return {"notification_status": status, "notifications": channels, "owner_notifications": owner}
+
+
+async def _owner_alerts(alert: dict, cfg: dict, subject: str, body: str, since) -> dict:
+    """Alerts for the account whose own device the node is: email to their address and their linked
+    Telegram, each switchable on their readings page. Same minimum severity and cooldown as the site."""
+    db = get_db()
+    node = await db.sensor_nodes.find_one({"node_id": alert["node_id"]}, {"_id": 0, "owner_id": 1})
+    owner_id = (node or {}).get("owner_id")
+    user = await db.users.find_one({"id": owner_id}, {"_id": 0}) if owner_id else None
+    if not user or not user.get("active", True):
+        return {}
+    s = get_settings()
+    recent = await db.alert_events.find_one({
+        "id": {"$ne": alert["id"]}, "node_id": alert["node_id"], "parameter": alert["parameter"],
+        "owner_notification_status": "sent", "created_at": {"$gte": since}})
+    plan = {
+        "email": (s.email_configured, user.get("alert_email", True), [user["email"]]),
+        "telegram": (s.telegram_configured, user.get("alert_telegram", True),
+                     [user["telegram_chat_id"]] if user.get("telegram_chat_id") else []),
+    }
+    out = {}
+    for channel, (configured, enabled, to) in plan.items():
+        if not configured:
+            out[channel] = {"status": "disabled", "reason": "Not set up on this site"}
+        elif not to:
+            out[channel] = {"status": "disabled", "reason": "Telegram not connected"}
+        elif not enabled:
+            out[channel] = {"status": "disabled", "reason": "Turned off by the user"}
+        elif SEVERITY_RANK[alert["severity"]] < SEVERITY_RANK[cfg["min_severity"]]:
+            out[channel] = {"status": "disabled", "reason": f"Below minimum severity ({cfg['min_severity']})"}
+        elif recent:
+            out[channel] = {"status": "disabled", "reason": "Suppressed by notification cooldown"}
+        else:
+            try:
+                if channel == "email":
+                    await send_email(to, subject, body)
+                else:
+                    await send_telegram(to, body)
+                await _log(alert["id"], channel, to, "sent", reason="owner")
+                out[channel] = {"status": "sent", "sent_at": utcnow()}
+            except Exception as exc:  # noqa: BLE001
+                msg = str(exc) or exc.__class__.__name__
+                await _log(alert["id"], channel, to, "failed", error=msg, reason="owner")
+                out[channel] = {"status": "failed", "error": msg}
+    return out
 
 
 async def send_test(channel: str) -> dict:

@@ -200,7 +200,7 @@ async def list_users(user: dict = Depends(require_admin)):
     counts: dict = {}
     for n in await db.sensor_nodes.find({"owner_id": {"$ne": None}}, {"_id": 0, "owner_id": 1}).to_list(None):
         counts[n["owner_id"]] = counts.get(n["owner_id"], 0) + 1
-    return {"items": clean([{**public_user(u), "node_count": counts.get(u["id"], 0)} for u in users])}
+    return {"items": clean([{**public_user(u), "node_count": counts.get(u["id"], 0), "building_name": u.get("building_name")} for u in users])}
 
 
 @router.post("/users", status_code=201)

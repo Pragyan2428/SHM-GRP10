@@ -29,9 +29,9 @@ export default function UserStructure() {
       <div className="page-head">
         <div>
           <Link to="/users" className="small row" style={{ gap: 4 }} data-testid="user-structure-back"><ArrowLeft size={13} aria-hidden="true" /> Users</Link>
-          <h1 data-testid="page-title">{u.name}’s building</h1>
+          <h1 data-testid="page-title">{u.building_name || `${u.name}’s building`}</h1>
           <p>
-            <span className="mono">{u.email}</span> · <Badge value={u.role} label={u.role === 'admin' ? 'Administrator' : 'Viewer'} /> ·{' '}
+            {u.building_name ? <>{u.name} · </> : null}<span className="mono">{u.email}</span> · <Badge value={u.role} label={u.role === 'admin' ? 'Administrator' : 'Viewer'} /> ·{' '}
             <span data-testid="user-structure-count">{t.total_nodes} node{t.total_nodes === 1 ? '' : 's'}</span>, {t.active_nodes} online
           </p>
         </div>

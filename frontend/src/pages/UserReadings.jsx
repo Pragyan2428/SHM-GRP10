@@ -9,6 +9,7 @@ import { BrandMark } from '../components/Layout'
 import { PARAM_ICON } from '../components/monitoring'
 import ProfileMenu, { Avatar } from '../components/ProfileMenu'
 import ConnectDevice from '../components/ConnectDevice'
+import MyAlerts from '../components/MyAlerts'
 import { IsoBuilding, floorName, placeNodes } from '../components/twin'
 import { Banner, EmptyState, Loading } from '../components/ui'
 import { api } from '../lib/api'
@@ -116,6 +117,7 @@ export default function UserReadings() {
   const [show, setShow] = useState('all')
   const [selected, setSelected] = useState(null)
   const [floor, setFloor] = useState(null)
+  const [naming, setNaming] = useState(null) // building name being edited
   const [, setTick] = useState(0)
   const history = useRollingHistory(data)
 
@@ -165,8 +167,21 @@ export default function UserReadings() {
         <div className="ud-workspace">
           <span className="ud-ws-icon"><Building2 size={16} aria-hidden="true" /></span>
           <span style={{ minWidth: 0 }}>
-            <span className="ud-ws-k">Monitored structure</span>
-            <span className="ud-ws-v">{data?.structure_name || 'Loading…'}</span>
+            <span className="ud-ws-k">Your building</span>
+            {naming == null ? (
+              <button type="button" className="ud-ws-v ud-ws-edit" onClick={() => setNaming(data?.structure_name || '')} title="Rename your building"
+                data-testid="ud-building-name">{data?.structure_name || 'Loading…'}</button>
+            ) : (
+              <form className="ud-ws-form" onSubmit={async (e) => {
+                e.preventDefault()
+                if (!naming.trim()) return
+                try { await api('/api/profile/building', { method: 'PUT', body: { building_name: naming } }); setNaming(null); load() } catch { /* keep editing */ }
+              }}>
+                <input value={naming} onChange={(e) => setNaming(e.target.value)} maxLength={80} autoFocus aria-label="Building name"
+                  onKeyDown={(e) => { if (e.key === 'Escape') setNaming(null) }} data-testid="ud-building-name-input" />
+                <button type="submit" data-testid="ud-building-name-save">Save</button>
+              </form>
+            )}
           </span>
         </div>
         <label className="ud-search">
@@ -214,6 +229,7 @@ export default function UserReadings() {
         {!data ? <Loading label="Loading readings…" testid="user-loading-state" /> : data.total_nodes === 0 ? (
           <div className="ud-empty-start" data-testid="user-no-nodes">
             <ConnectDevice user={user} open />
+            <MyAlerts />
           </div>
         ) : (
           <>
@@ -328,6 +344,7 @@ export default function UserReadings() {
               </article>
             </section>
 
+            <MyAlerts />
             <ConnectDevice user={user} open={false} />
           </>
         )}

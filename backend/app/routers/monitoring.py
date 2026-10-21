@@ -82,6 +82,12 @@ async def telemetry(user: dict = Depends(current_user), settings: Settings = Dep
     db = get_db()
     thresholds = await get_thresholds()
     ids = await visible_node_ids(user)
+    # each account names its own building; admins see the site's name (or the account's they look at)
+    structure_name = settings.structure_name
+    who = user["id"] if ids is not None else (owner if owner and owner != "site" else None)
+    if who:
+        u = await db.users.find_one({"id": who}, {"_id": 0, "building_name": 1})
+        structure_name = (u or {}).get("building_name") or "My building"
     if owner and ids is None:  # an administrator looking at one account's building
         ids = [n["node_id"] for n in await db.sensor_nodes.find(
             {"owner_id": None if owner == "site" else owner}, {"_id": 0, "node_id": 1}).to_list(None)]
@@ -130,7 +136,7 @@ async def telemetry(user: dict = Depends(current_user), settings: Settings = Dep
     system_status = ("critical" if critical_now or open_alerts else
                      "warning" if open_warnings or connection != "healthy" else "nominal")
     return clean({
-        "server_time": utcnow(), "structure_name": settings.structure_name,
+        "server_time": utcnow(), "structure_name": structure_name,
         "connection": connection, "last_reading_at": last,
         "simulator_enabled": system.get("simulator_enabled"),
         "system_status": system_status,

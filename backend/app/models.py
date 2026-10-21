@@ -85,6 +85,16 @@ class SignupRequest(BaseModel):
     password: str = Field(min_length=10, max_length=128)
 
 
+class AlertPrefs(BaseModel):
+    """A user's own alerts for their own nodes."""
+    email_enabled: Optional[bool] = None
+    telegram_enabled: Optional[bool] = None
+
+
+class BuildingName(BaseModel):
+    building_name: str = Field(min_length=1, max_length=80)
+
+
 class ProfileUpdate(BaseModel):
     """Changes a signed-in user may make to their own account."""
     name: str = Field(min_length=1, max_length=80)

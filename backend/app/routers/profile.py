@@ -8,8 +8,12 @@ import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from ..db import audit, get_db, utcnow
-from ..models import AvatarUpdate, PasswordChange, ProfileUpdate
+from datetime import timedelta
+
+from ..config import get_settings
+from ..db import as_utc, audit, get_db, utcnow
+from ..models import AlertPrefs, AvatarUpdate, BuildingName, PasswordChange, ProfileUpdate
+from ..services import notifications
 from ..security import current_user, hash_password, public_user, verify_password
 
 router = APIRouter(prefix="/api/profile", tags=["profile"])
@@ -132,3 +136,82 @@ async def rotate_device_key(user: dict = Depends(current_user)):
     await get_db().users.update_one({"id": user["id"]}, {"$set": {"device_key": key}})
     await audit(user, "device_key_rotated", user["id"])
     return await _device_info(user["id"], key)
+
+
+# ---- the user's own alerts ---------------------------------------------------------------------------
+# Alerts for this account's own nodes go to its email address and, once linked, its Telegram.
+def _alerts_view(u: dict) -> dict:
+    s = get_settings()
+    return {
+        "email": {"available": s.email_configured, "enabled": u.get("alert_email", True), "address": u["email"]},
+        "telegram": {"available": s.telegram_configured, "linked": bool(u.get("telegram_chat_id")),
+                     "name": u.get("telegram_name"), "enabled": u.get("alert_telegram", True)},
+    }
+
+
+async def _me(user_id: str) -> dict:
+    return await get_db().users.find_one({"id": user_id}, {"_id": 0})
+
+
+@router.get("/alerts")
+async def my_alerts(user: dict = Depends(current_user)):
+    return _alerts_view(await _me(user["id"]))
+
+
+@router.put("/alerts")
+async def set_my_alerts(body: AlertPrefs, user: dict = Depends(current_user)):
+    changes = {}
+    if body.email_enabled is not None:
+        changes["alert_email"] = body.email_enabled
+    if body.telegram_enabled is not None:
+        changes["alert_telegram"] = body.telegram_enabled
+    if changes:
+        await get_db().users.update_one({"id": user["id"]}, {"$set": changes})
+    return _alerts_view(await _me(user["id"]))
+
+
+@router.post("/telegram/link")
+async def telegram_link(user: dict = Depends(current_user)):
+    """A personal t.me link: pressing Start through it connects this account's Telegram."""
+    if not get_settings().telegram_configured:
+        raise HTTPException(409, "Telegram alerts are not set up on this site yet")
+    try:
+        bot = await notifications.telegram_bot_username()
+    except notifications.NotificationError as exc:
+        raise HTTPException(502, str(exc))
+    code = secrets.token_urlsafe(12).replace("-", "a").replace("_", "b")  # t.me start codes: A-Z a-z 0-9 _ -
+    await get_db().users.update_one({"id": user["id"]}, {"$set": {
+        "telegram_link_code": code, "telegram_link_expires": utcnow() + timedelta(minutes=30)}})
+    return {"url": f"https://t.me/{bot}?start={code}", "bot": bot}
+
+
+@router.post("/telegram/check")
+async def telegram_check(user: dict = Depends(current_user)):
+    """Called by the page after the user opened the link: has Start been pressed yet?"""
+    u = await _me(user["id"])
+    code, expires = u.get("telegram_link_code"), as_utc(u.get("telegram_link_expires"))
+    if code and expires and expires > utcnow() and get_settings().telegram_configured:
+        chat = await notifications.find_start_code(code)
+        if chat:
+            await get_db().users.update_one({"id": user["id"]}, {
+                "$set": {"telegram_chat_id": chat["id"], "telegram_name": chat["name"], "alert_telegram": True},
+                "$unset": {"telegram_link_code": "", "telegram_link_expires": ""}})
+            await audit(user, "telegram_linked", user["id"])
+            u = await _me(user["id"])
+    return _alerts_view(u)
+
+
+@router.delete("/telegram")
+async def telegram_unlink(user: dict = Depends(current_user)):
+    await get_db().users.update_one({"id": user["id"]}, {"$unset": {"telegram_chat_id": "", "telegram_name": ""}})
+    return _alerts_view(await _me(user["id"]))
+
+
+@router.put("/building")
+async def set_building_name(body: BuildingName, user: dict = Depends(current_user)):
+    """The name of this account's building, shown on its dashboard and to administrators."""
+    name = body.building_name.strip()
+    if not name:
+        raise HTTPException(422, "Enter a building name")
+    await get_db().users.update_one({"id": user["id"]}, {"$set": {"building_name": name}})
+    return {"building_name": name}

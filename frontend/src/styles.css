@@ -953,3 +953,25 @@ input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
 .dialog:has(.node-form) { width: min(640px, calc(100vw - 32px)); }
 .node-form .plan-svg { max-height: 300px; border: 1px solid var(--line); border-radius: 10px; }
 .node-card-actions { flex-wrap: wrap; gap: 6px; }
+
+/* ---------- user page: My alerts, building name ---------- */
+.ud-alerts .ud-card-head h2 { display: flex; align-items: center; gap: 8px; }
+.ud-alert-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid #eef0f3; flex-wrap: wrap; }
+.ud-alert-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: #f2f4f6; color: var(--ud-ink); flex-shrink: 0; }
+.ud-alert-text { display: flex; flex-direction: column; flex: 1; min-width: 160px; font-size: 13px; color: #5b616b; }
+.ud-alert-text strong { color: var(--ud-ink); font-size: 14px; }
+.ud-alert-row .ud-pill { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; cursor: pointer; }
+.ud-pill-accent { background: #ff7a1a; border-color: #ff7a1a; color: #fff; }
+.ud-switch { position: relative; display: inline-flex; cursor: pointer; }
+.ud-switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: inherit; }
+.ud-switch-track { width: 40px; height: 22px; border-radius: 999px; background: #d6dae0; position: relative; transition: background .15s; }
+.ud-switch-track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.ud-switch input:checked + .ud-switch-track { background: #16a35a; }
+.ud-switch input:checked + .ud-switch-track::after { transform: translateX(18px); }
+.ud-switch input:focus-visible + .ud-switch-track { outline: 2px solid #ff7a1a; outline-offset: 2px; }
+.ud-switch.disabled { opacity: .45; cursor: not-allowed; }
+.ud-ws-edit { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-size: 12.5px; font-weight: 700; text-align: left; cursor: pointer; max-width: 100%; }
+.ud-ws-edit:hover { text-decoration: underline dotted; }
+.ud-ws-form { display: flex; gap: 4px; margin-top: 2px; }
+.ud-ws-form input { min-width: 0; flex: 1; font-size: 12.5px; padding: 3px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.08); color: inherit; }
+.ud-ws-form button { font-size: 12px; padding: 3px 8px; border-radius: 6px; border: 0; background: #ff7a1a; color: #fff; cursor: pointer; }

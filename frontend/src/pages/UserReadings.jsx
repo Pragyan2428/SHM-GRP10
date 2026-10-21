@@ -8,7 +8,8 @@ import { AlertTriangle, ArrowDownRight, ArrowUpRight, Building2, CheckCircle2, G
 import { BrandMark } from '../components/Layout'
 import { PARAM_ICON } from '../components/monitoring'
 import ProfileMenu, { Avatar } from '../components/ProfileMenu'
-import { FLOOR_NAMES, IsoBuilding, placeNodes } from '../components/twin'
+import ConnectDevice from '../components/ConnectDevice'
+import { IsoBuilding, floorName, placeNodes } from '../components/twin'
 import { Banner, EmptyState, Loading } from '../components/ui'
 import { api } from '../lib/api'
 import { useAuth } from '../lib/context'
@@ -136,7 +137,7 @@ export default function UserReadings() {
 
   const nodes = useMemo(() => [...(data?.nodes || [])].sort((a, b) => (b.online - a.online) || a.node_id.localeCompare(b.node_id)), [data])
   const byId = useMemo(() => [...nodes].sort((a, b) => a.node_id.localeCompare(b.node_id)), [nodes])
-  const placed = useMemo(() => placeNodes(byId), [byId])
+  const view = useMemo(() => placeNodes(byId), [byId])
 
   const counts = { nominal: 0, warning: 0, critical: 0 }
   nodes.filter((n) => n.online).forEach((n) => PARAMS.forEach((p) => {
@@ -210,7 +211,11 @@ export default function UserReadings() {
 
         {error ? <Banner kind="offline" testid="user-connection-error"><strong>Connection problem:</strong> {error} Retrying…</Banner> : null}
 
-        {!data ? <Loading label="Loading readings…" testid="user-loading-state" /> : (
+        {!data ? <Loading label="Loading readings…" testid="user-loading-state" /> : data.total_nodes === 0 ? (
+          <div className="ud-empty-start" data-testid="user-no-nodes">
+            <ConnectDevice user={user} open />
+          </div>
+        ) : (
           <>
             <section className="ud-kpis" aria-label="Highest readings">
               {data.parameters.map((x, i) => <KpiCard key={x.parameter} p={x} dark={i === 0} />)}
@@ -304,9 +309,10 @@ export default function UserReadings() {
               <article className="ud-card ud-map" id="ud-map" aria-labelledby="ud-map-title" data-testid="ud-map">
                 <div className="ud-card-head">
                   <h2 id="ud-map-title">Building map</h2>
-                  <select value={floor ?? ''} onChange={(e) => setFloor(e.target.value === '' ? null : Number(e.target.value))} className="ud-select dark" aria-label="Floor">
+                  <select value={floor ?? ''} onChange={(e) => setFloor(e.target.value === '' ? null : e.target.value === 'roof' ? 'roof' : Number(e.target.value))}
+                    className="ud-select dark" aria-label="Floor" data-testid="ud-floor-select">
                     <option value="">All floors</option>
-                    {FLOOR_NAMES.map((f, i) => <option key={f} value={i}>{f}</option>)}
+                    {view.layout.floors.map((f) => <option key={f} value={f}>{floorName(f)}</option>)}
                   </select>
                 </div>
                 {focus ? (
@@ -317,10 +323,12 @@ export default function UserReadings() {
                   </div>
                 ) : null}
                 <div className="ud-map-art">
-                  <IsoBuilding nodes={byId} params={data.parameters} placed={placed} selectedId={focus?.node_id} floor={floor} onSelect={setSelected} />
+                  <IsoBuilding nodes={byId} params={data.parameters} view={view} selectedId={focus?.node_id} floor={floor} onSelect={setSelected} />
                 </div>
               </article>
             </section>
+
+            <ConnectDevice user={user} open={false} />
           </>
         )}
       </main>

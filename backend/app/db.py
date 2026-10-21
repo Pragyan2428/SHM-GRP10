@@ -98,6 +98,8 @@ async def ensure_indexes(settings: Settings) -> None:
     await db.users.create_index("email", unique=True)
     await db.users.create_index("id", unique=True)
     await db.sensor_nodes.create_index("node_id", unique=True)
+    await db.sensor_nodes.create_index("owner_id")
+    await db.users.create_index("device_key", unique=True, sparse=True)
     await db.sensor_readings.create_index([("node_id", 1), ("parameter", 1), ("timestamp", -1)])
     await db.sensor_readings.create_index([("timestamp", -1)])
     await db.sensor_readings.create_index(

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { ADMIN, VIEWER } from './env.js'
-import { BREACH, alertFor, ingest, login, uniqueNode } from './helpers.js'
+import { BREACH, alertFor, ingest, login, myDeviceKey, uniqueNode } from './helpers.js'
 
 const WIDTH = 390
 test.use({ viewport: { width: WIDTH, height: 844 }, isMobile: true, hasTouch: true })
@@ -52,8 +52,8 @@ test('every dashboard route fits 390px as admin', async ({ page, request }) => {
 
 test('readings page fits 390px as a user', async ({ page, request }) => {
   const node = uniqueNode()
-  await ingest(request, node, BREACH)
   await login(page, VIEWER)
+  await ingest(request, node, BREACH, await myDeviceKey(page))
   await expect(page).toHaveURL(/\/user$/)
   await expect(page.getByTestId(`user-node-card-${node}`)).toBeVisible()
   await expectNoHorizontalOverflow(page, '/user')

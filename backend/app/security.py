@@ -151,6 +151,19 @@ async def clear_failures(key: str) -> None:
 
 
 # ---- device authentication ----------------------------------------------------
+async def device_owner(node_id: str, presented: Optional[str], settings: Settings) -> Optional[dict]:
+    """The account whose personal device key was presented, or None for the site-wide
+    DEVICE_SHARED_KEY / DEVICE_KEYS (the admin's own devices). Raises 401/503 otherwise."""
+    if presented:
+        owner = await get_db().users.find_one({"device_key": presented}, {"_id": 0, "id": 1, "active": 1, "device_key": 1})
+        if owner and hmac.compare_digest(owner["device_key"].encode(), presented.encode()):
+            if not owner.get("active", True):
+                raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This device key belongs to a disabled account")
+            return owner
+    verify_device(node_id, presented, settings)
+    return None
+
+
 def verify_device(node_id: str, presented: Optional[str], settings: Settings) -> None:
     if not settings.device_auth_configured:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,

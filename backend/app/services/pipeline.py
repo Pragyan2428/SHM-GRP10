@@ -34,14 +34,19 @@ def _alert_id() -> str:
     return "ALT-" + new_id()[:8].upper()
 
 
-async def process_payload(payload, source: str) -> dict:
-    """`payload` is a validated IngestPayload. Returns the processed readings + alert info."""
+class NodeOwnershipError(Exception):
+    """The node ID is already used by a device of another account (or of the site itself)."""
+
+
+async def process_payload(payload, source: str, owner_id: Optional[str] = None) -> dict:
+    """`payload` is a validated IngestPayload; `owner_id` is the account whose personal device key
+    sent it (None for the site-wide key, MQTT and the simulator). Returns the processed readings + alert info."""
     assert source in SOURCES
     async with _node_locks[payload.node_id]:
-        return await _process(payload, source)
+        return await _process(payload, source, owner_id)
 
 
-async def _process(payload, source: str) -> dict:
+async def _process(payload, source: str, owner_id: Optional[str] = None) -> dict:
     db = get_db()
     now = utcnow()
     ts: datetime = payload.timestamp or now
@@ -56,6 +61,9 @@ async def _process(payload, source: str) -> dict:
                     "alerts": [], "alert_triggered": False}
 
     node = await db.sensor_nodes.find_one({"node_id": node_id}, {"_id": 0}) or {}
+    if node and node.get("owner_id") != owner_id:
+        raise NodeOwnershipError(f"{node_id} is already used by another device on this site. "
+                                 "Give your ESP32 a different NODE_ID (for example add your name).")
     location = payload.location or node.get("location") or "Unassigned location"
     thresholds = await get_thresholds()
 
@@ -122,11 +130,13 @@ async def _process(payload, source: str) -> dict:
         node_update["rssi"] = payload.rssi
     if payload.firmware:
         node_update["firmware"] = payload.firmware
+    if payload.floor is not None:  # otherwise the floor is read from the location text
+        node_update["floor"] = payload.floor
     await db.sensor_nodes.update_one(
         {"node_id": node_id},
         {"$set": node_update,
          "$setOnInsert": {"created_at": now, "firmware_default": "unknown",
-                          "calibrated_at": now, "label": node_id}},
+                          "calibrated_at": now, "label": node_id, "owner_id": owner_id}},
         upsert=True)
     await db.integration_settings.update_one(
         {"key": "telemetry_meta"}, {"$set": {"value": {"last_reading_at": now, "last_source": source}}},

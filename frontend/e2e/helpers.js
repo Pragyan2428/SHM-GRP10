@@ -17,10 +17,12 @@ export function uniqueNode() {
   return `E2E-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`.toUpperCase()
 }
 
-/** POST a reading straight to the device ingestion endpoint, as an ESP32 would. */
-export async function ingest(request, nodeId, readings) {
+/** POST a reading straight to the device ingestion endpoint, as an ESP32 would.
+ * `key` defaults to the site-wide key (the admin's devices); pass a user's personal key to
+ * make the node theirs. */
+export async function ingest(request, nodeId, readings, key = DEVICE_KEY) {
   const res = await request.post(`${API}/api/ingest`, {
-    headers: { 'X-Device-Key': DEVICE_KEY },
+    headers: { 'X-Device-Key': key },
     data: { node_id: nodeId, location: 'E2E test span', readings, battery: 90, rssi: -60 },
   })
   expect(res.status(), await res.text()).toBe(200)
@@ -53,4 +55,11 @@ export async function logout(page) {
   const card = page.getByTestId('profile-card')
   await expect(card).toBeVisible()
   await card.getByRole('button', { name: 'Log out' }).click()
+}
+
+/** The signed-in account's personal device key (nodes sent with it show only for that account). */
+export async function myDeviceKey(page) {
+  const r = await page.request.get('/api/profile/device', { headers: { 'X-SHM-Client': 'web' } })
+  expect(r.status(), await r.text()).toBe(200)
+  return (await r.json()).device_key
 }

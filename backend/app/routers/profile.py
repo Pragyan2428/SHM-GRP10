@@ -1,9 +1,10 @@
-"""The signed-in user's own profile: display name, password and profile picture."""
+"""The signed-in user's own profile: display name, password, profile picture and device key."""
 from __future__ import annotations
 
 import base64
 import binascii
 import re
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
@@ -99,3 +100,35 @@ async def get_avatar(user: dict = Depends(current_user)):
     # URLs carry a version (?v=...), so the browser may cache each picture privately.
     return Response(content=bytes(doc["data"]), media_type=doc["content_type"],
                     headers={"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff"})
+
+
+# ---- personal device key --------------------------------------------------------------------
+# An ESP32 that sends this key in X-Device-Key belongs to this account: its readings, the
+# building drawing and its alerts show up for this account only (administrators see every node).
+def _new_device_key() -> str:
+    return "shm_" + secrets.token_urlsafe(24)
+
+
+async def _device_info(user_id: str, key: str) -> dict:
+    nodes = await get_db().sensor_nodes.find({"owner_id": user_id}, {"_id": 0, "node_id": 1}).sort("node_id", 1).to_list(None)
+    return {"device_key": key, "ingest_path": "/api/ingest", "nodes": [n["node_id"] for n in nodes]}
+
+
+@router.get("/device")
+async def get_device_key(user: dict = Depends(current_user)):
+    db = get_db()
+    stored = await db.users.find_one({"id": user["id"]}, {"_id": 0, "device_key": 1})
+    key = (stored or {}).get("device_key")
+    if not key:
+        key = _new_device_key()
+        await db.users.update_one({"id": user["id"], "device_key": {"$exists": False}}, {"$set": {"device_key": key}})
+        key = (await db.users.find_one({"id": user["id"]}, {"_id": 0, "device_key": 1}))["device_key"]
+    return await _device_info(user["id"], key)
+
+
+@router.post("/device/rotate")
+async def rotate_device_key(user: dict = Depends(current_user)):
+    key = _new_device_key()
+    await get_db().users.update_one({"id": user["id"]}, {"$set": {"device_key": key}})
+    await audit(user, "device_key_rotated", user["id"])
+    return await _device_info(user["id"], key)

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { ADMIN, VIEWER } from './env.js'
-import { ingest, login, logout, uniqueNode } from './helpers.js'
+import { ingest, login, logout, myDeviceKey, uniqueNode } from './helpers.js'
 
 test('the login page is titled Login', async ({ page }) => {
   await page.goto('/')
@@ -49,8 +49,8 @@ test('logout ends the session', async ({ page }) => {
 test.describe('user role', () => {
   test('lands on the readings page and sees live readings', async ({ page, request }) => {
     const node = uniqueNode()
-    await ingest(request, node, { strain: 333.3, temperature: 25.5 })
     await login(page, VIEWER)
+    await ingest(request, node, { strain: 333.3, temperature: 25.5 }, await myDeviceKey(page))
     await expect(page).toHaveURL(/\/user$/)
     await expect(page.getByTestId('page-title')).toHaveText('Dashboard')
     await expect(page.getByTestId(`user-node-status-${node}`)).toHaveText(/online/i)
@@ -61,10 +61,11 @@ test.describe('user role', () => {
 
   test('readings refresh without reloading the page', async ({ page, request }) => {
     const node = uniqueNode()
-    await ingest(request, node, { strain: 300 })
     await login(page, VIEWER)
+    const key = await myDeviceKey(page)
+    await ingest(request, node, { strain: 300 }, key)
     await expect(page.getByTestId(`user-reading-${node}-strain`)).toContainText('300.0')
-    await ingest(request, node, { strain: 700 })
+    await ingest(request, node, { strain: 700 }, key)
     const tile = page.getByTestId(`user-reading-${node}-strain`)
     await expect(tile).toContainText('700.0', { timeout: 15_000 })
     await expect(tile).toHaveAttribute('data-status', 'critical')

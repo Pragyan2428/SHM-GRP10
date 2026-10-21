@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     frontend_url: str = Field(default="http://localhost:5173", alias="FRONTEND_URL")
     cookie_secure: bool = Field(default=True, alias="COOKIE_SECURE")
     cookie_samesite: str = Field(default="lax", alias="COOKIE_SAMESITE")
-    structure_name: str = Field(default="Academic Block A (G+3 building)", alias="STRUCTURE_NAME")
+    structure_name: str = Field(default="My building", alias="STRUCTURE_NAME")  # shown in the header
 
     # Bootstrap accounts (only used to seed an empty users collection)
     admin_email: Optional[str] = Field(default=None, alias="ADMIN_EMAIL")

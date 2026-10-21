@@ -2,7 +2,7 @@
 
 Electronics Product Development (EPD) · HS30223 · Group 10: Laksha Mandiye (2430039), Pragyan Singh (2430048), Pranjal Gurnule (2430049), Kamayani Sinha (2430160).
 
-Wireless ESP32 sensor nodes measure **strain** (HX711 strain gauge amplifier), **vibration** (ADXL345 3-axis accelerometer) and **temperature** (DS18B20) at several points of a building. The readings are sent over Wi-Fi to the cloud, checked against configurable limits, scored for trend-based anomalies and stored in MongoDB. Problems become alerts on the dashboard, in the browser, by email, SMS and WhatsApp, and in Google Sheets. The public **About the project** page (`/about`) opens with a 3D model of the sensor node (three.js) that comes apart as you scroll, naming each part, and presents the problem, solution, hardware, comparison, timeline and team from the project presentation. The demo structure is a G+3 building with six simulated nodes from the foundation to the roof.
+Wireless ESP32 sensor nodes measure **strain** (HX711 strain gauge amplifier), **vibration** (ADXL345 3-axis accelerometer) and **temperature** (DS18B20) at several points of a building. The readings are sent over Wi-Fi to the cloud, checked against configurable limits, scored for trend-based anomalies and stored in MongoDB. Problems become alerts on the dashboard, in the browser, by email, SMS and WhatsApp, and in Google Sheets. The public **About the project** page (`/about`) opens with a 3D model of the sensor node (three.js) that comes apart as you scroll, naming each part, and presents the problem, solution, hardware, comparison, timeline and team from the project presentation. The building view is drawn from the nodes that connect, so it fits whatever building is being monitored. It has as many storeys as the nodes' floors need, each node is pinned on its own floor, and the floor filters list only floors that have sensors. A node's floor comes from the location text it sends ("Ground floor – column C2", "2nd floor slab", "Floor 7", "Level 4", "3F", "Basement 2", "Roof…"), or from an optional `floor` field (`0` = ground, `-1` = basement, `"roof"`). Nodes without a floor stand beside the building. With the simulator on, six demo nodes fill a G+3 building with a roof.
 
 ```
 React (Vite) ──/api──► FastAPI ──► MongoDB
@@ -54,7 +54,7 @@ All secrets come from environment variables. None are hard-coded, and none are s
 | Core | `MONGO_URL`, `DB_NAME`, `JWT_SECRET` (≥32 chars), `JWT_EXPIRE_MINUTES`, `FRONTEND_URL` (explicit CORS origins), `COOKIE_SECURE`, `COOKIE_SAMESITE`, `STRUCTURE_NAME` |
 | Accounts | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`, `ADMIN_RESET` (see above), `SEED_VIEWER_*`, `ALLOW_SIGNUP` (default `true`), `SIGNUP_EMAIL_DOMAIN` (default `gmail.com`), `LOGIN_MAX_ATTEMPTS`, `LOGIN_WINDOW_MINUTES`, `LOGIN_LOCKOUT_MINUTES` |
 | Telemetry | `SIMULATOR_ENABLED`, `SIMULATOR_INTERVAL_SECONDS` (5), `NODE_OFFLINE_SECONDS` (30), `READING_RETENTION_DAYS` (TTL index) |
-| Devices | `DEVICE_SHARED_KEY` or `DEVICE_KEYS=ESP32-01:key1,ESP32-02:key2` |
+| Devices | `DEVICE_SHARED_KEY` or `DEVICE_KEYS=ESP32-01:key1,ESP32-02:key2` for the site's own devices; every account also has a personal device key (see below) |
 | Email | `EMAIL_PROVIDER` (`smtp`/`resend`/`sendgrid`), `EMAIL_FROM`; SMTP: `SMTP_HOST` (default `smtp.gmail.com`), `SMTP_PORT` (587, or 465 for SSL), `SMTP_USERNAME`, `SMTP_PASSWORD`; Resend/SendGrid: `EMAIL_API_KEY` |
 | SMS | `SMS_PROVIDER=twilio`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` |
 | WhatsApp | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM` (sandbox `+14155238886`) |
@@ -65,7 +65,13 @@ If an integration is missing its credentials, it shows as **Not configured** in 
 
 ## Connecting ESP32 nodes
 
-**HTTP**: `POST /api/ingest` with header `X-Device-Key`:
+**Whose nodes are whose.** Every account has a **personal device key**, shown with **Show / Copy / New key** on the **Connect your ESP32** card of its readings page. The card also gives the website's ingest URL, ready-to-paste `secrets.h` lines, a suggested unique `NODE_ID` and a dummy-node command.
+- **A node sent with an account's key belongs to that account.** That account sees only its own nodes, readings, alerts and building drawing; a new account starts empty and only sees the card. Administrators see every node.
+- **Node IDs can't be taken over.** Once a node ID belongs to an account (or to the site's own devices), a device with any other key gets `409` "Give your ESP32 a different NODE_ID".
+- **The site's own devices** (`DEVICE_SHARED_KEY` / `DEVICE_KEYS`, MQTT, the simulator) belong to no account, so only administrators see them.
+- **New key** (`POST /api/profile/device/rotate`) disconnects the old key at once. The key of a disabled account is refused. `GET /api/profile/device` returns the key and the account's node IDs.
+
+**HTTP**: `POST /api/ingest` with header `X-Device-Key` (a personal key, or the site-wide key):
 
 ```json
 { "node_id": "ESP32-07", "location": "Ground floor - column C2", "timestamp": "2026-01-01T12:00:00Z",
@@ -160,10 +166,10 @@ Every request must carry the secret, so the URL alone is not enough to write to 
 ## Tests
 
 ```bash
-cd backend && python -m pytest        # 101 API tests, in-memory MongoDB
+cd backend && python -m pytest        # 137 API tests, in-memory MongoDB
 ```
 
-End-to-end (Playwright, 47 tests in `frontend/e2e`):
+End-to-end (Playwright, 49 tests in `frontend/e2e`):
 
 ```bash
 cd frontend
@@ -182,7 +188,9 @@ Failures keep a trace and screenshot; `npx playwright show-report` opens the HTM
 | Admin login / invalid login / lockout / logout / session expiry | `tests/test_auth.py`; UI flows in `e2e/auth.spec.js` |
 | Sign-up: viewer-only accounts, Gmail-only emails, duplicate email, validation, rate limit, `ALLOW_SIGNUP` | `tests/test_signup.py`; UI flow in `e2e/signup.spec.js` |
 | Viewer permissions, API authentication, CSRF header | `tests/test_auth.py`; in `e2e/auth.spec.js`, viewers land on the `/user` readings page, readings refresh live, and dashboard URLs redirect back to `/user` |
+| Personal device keys: a new account sees only the Connect card, then only its own nodes and alerts; no node ID takeover; key rotation; disabled accounts refused; admins see all | `tests/test_ownership.py`; `e2e/profile.spec.js` |
 | Simulated telemetry, HTTP ingestion, device auth, validation | `tests/test_telemetry.py` |
+| Building view drawn from the nodes: floor read from the location text or a `floor` field, pins on their floor, filters only for floors with sensors | `tests/test_floors.py`; `e2e/project.spec.js` |
 | Threshold events, dedupe, cooldown, debounce, acknowledgement | `tests/test_telemetry.py`; alert toast after `POST /api/ingest` and acknowledgement in `e2e/alerts.spec.js` |
 | Anomaly scoring and early warnings, node online/offline, MQTT handler | `tests/test_telemetry.py` |
 | MongoDB persistence across an API restart | `tests/test_telemetry.py::test_data_persists_across_restart` |

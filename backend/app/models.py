@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timedelta, timezone
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from .services.floors import normalise_floor
 from .services.thresholds import PARAMETERS
 
 # Physically plausible bounds - anything outside is rejected as a sensor/payload fault.
@@ -28,11 +29,18 @@ class IngestPayload(BaseModel):
     rssi: Optional[int] = Field(default=None, ge=-120, le=0)
     firmware: Optional[str] = Field(default=None, max_length=32)
     error: Optional[str] = Field(default=None, max_length=200)
+    # optional: 0 = ground, 2 = second floor, -1 = basement, "roof"; otherwise read from `location`
+    floor: Optional[Union[int, str]] = None
 
     @field_validator("node_id")
     @classmethod
     def _upper(cls, v: str) -> str:
         return v.upper()
+
+    @field_validator("floor", mode="before")
+    @classmethod
+    def _floor(cls, v):
+        return normalise_floor(v)  # anything unreadable becomes None rather than rejecting the reading
 
     @field_validator("timestamp")
     @classmethod

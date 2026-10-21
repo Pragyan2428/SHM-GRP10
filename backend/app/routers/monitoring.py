@@ -10,8 +10,9 @@ from pydantic import ValidationError
 from ..config import Settings, get_settings
 from ..db import as_utc, audit, clean, get_db, get_setting, utcnow
 from ..models import AckRequest, IngestPayload, MqttTest
-from ..security import current_user, require_admin, verify_device
+from ..security import current_user, device_owner, require_admin
 from ..services import pipeline, sheets, tasks
+from ..services.floors import floor_from_location
 from ..services.thresholds import DEFAULTS, PARAMETERS, get_thresholds
 from .common import alert_query, reading_query
 
@@ -40,12 +41,29 @@ def _node_view(node: dict, settings: Settings) -> dict:
         "calibration_status": "due" if cal_due else "calibrated", "calibrated_at": calibrated_at,
         "latest": node.get("latest", {}), "last_reading_at": node.get("last_reading_at"),
         "error": error, "map_x": node.get("map_x"), "map_y": node.get("map_y"),
+        "floor": node.get("floor") if node.get("floor") is not None else floor_from_location(node.get("location")),
     })
 
 
-async def _connection(settings: Settings) -> tuple[str, Optional[datetime]]:
-    meta = await get_setting("telemetry_meta")
-    last = as_utc(meta.get("last_reading_at"))
+async def visible_node_ids(user: dict) -> Optional[list[str]]:
+    """None = every node (administrators); otherwise the nodes this account's own devices sent."""
+    if user.get("role") == "admin":
+        return None
+    return [n["node_id"] for n in await get_db().sensor_nodes.find({"owner_id": user["id"]}, {"_id": 0, "node_id": 1}).to_list(None)]
+
+
+def _restrict(f: dict, ids: Optional[list[str]]) -> dict:
+    if ids is None:
+        return f
+    wanted = f.get("node_id")
+    f["node_id"] = (wanted if wanted in ids else {"$in": []}) if isinstance(wanted, str) else {"$in": ids}
+    return f
+
+
+async def _connection(settings: Settings, last: Optional[datetime] = None, own: bool = False) -> tuple[str, Optional[datetime]]:
+    if not own:
+        meta = await get_setting("telemetry_meta")
+        last = as_utc(meta.get("last_reading_at"))
     if not last:
         return "no_data", None
     age = (utcnow() - last).total_seconds()
@@ -61,9 +79,11 @@ async def telemetry(user: dict = Depends(current_user), settings: Settings = Dep
                     points: int = Query(30, ge=5, le=200)):
     db = get_db()
     thresholds = await get_thresholds()
-    nodes = [_node_view(n, settings) for n in await db.sensor_nodes.find({}, {"_id": 0}).to_list(None)]
+    ids = await visible_node_ids(user)
+    mine = _restrict({}, ids)
+    nodes = [_node_view(n, settings) for n in await db.sensor_nodes.find(mine, {"_id": 0}).to_list(None)]
     states = {(s["node_id"], s["parameter"]): s for s in await db.anomaly_scores.find(
-        {}, {"_id": 0, "recent": 0, "baseline_var": 0}).to_list(None)}
+        mine, {"_id": 0, "recent": 0, "baseline_var": 0}).to_list(None)}
 
     params = []
     for p in PARAMETERS:
@@ -93,12 +113,13 @@ async def telemetry(user: dict = Depends(current_user), settings: Settings = Dep
             "current": focal, "readings": per_node, "series": series, "anomaly": anomaly,
         })
 
-    connection, last = await _connection(settings)
+    own_last = max((n["last_seen"] for n in nodes if n.get("last_seen")), default=None)
+    connection, last = await _connection(settings, own_last, own=ids is not None)
     system = await get_setting("system", {"simulator_enabled": settings.simulator_enabled})
     recent_states = [s for s in states.values()
                      if as_utc(s.get("updated_at")) and utcnow() - as_utc(s["updated_at"]) < timedelta(minutes=5)]
-    open_alerts = await db.alert_events.count_documents({"status": "open", "type": "threshold"})
-    open_warnings = await db.alert_events.count_documents({"status": "open", "type": "early_warning"})
+    open_alerts = await db.alert_events.count_documents({"status": "open", "type": "threshold", **mine})
+    open_warnings = await db.alert_events.count_documents({"status": "open", "type": "early_warning", **mine})
     active_nodes = sum(1 for n in nodes if n["online"])
     critical_now = any(r["status"] == "critical" for p in params for r in p["readings"] if r["online"])
     system_status = ("critical" if critical_now or open_alerts else
@@ -112,7 +133,7 @@ async def telemetry(user: dict = Depends(current_user), settings: Settings = Dep
         "open_alerts": open_alerts, "open_early_warnings": open_warnings,
         "overall_anomaly_score": round(max((s["score"] for s in recent_states), default=0), 1),
         "parameters": params,
-        "nodes": [{k: n[k] for k in ("node_id", "location", "online", "condition", "map_x", "map_y",
+        "nodes": [{k: n[k] for k in ("node_id", "location", "online", "condition", "map_x", "map_y", "floor",
                                      "latest", "last_seen", "battery", "rssi")} for n in nodes],
     })
 
@@ -126,8 +147,8 @@ async def telemetry_history(
     sort: Literal["newest", "oldest"] = "newest",
     page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=500),
 ):
-    f = reading_query(parameter=parameter, node_id=node_id, status=status, source=source, q=q,
-                      date_from=date_from, date_to=date_to)
+    f = _restrict(reading_query(parameter=parameter, node_id=node_id, status=status, source=source, q=q,
+                                date_from=date_from, date_to=date_to), await visible_node_ids(user))
     coll = get_db().sensor_readings
     total = await coll.count_documents(f)
     items = await coll.find(f, {"_id": 0}).sort("timestamp", -1 if sort == "newest" else 1) \
@@ -140,8 +161,11 @@ async def telemetry_history(
 @router.post("/ingest")
 async def ingest(payload: IngestPayload, x_device_key: Optional[str] = Header(default=None),
                  settings: Settings = Depends(get_settings)):
-    verify_device(payload.node_id, x_device_key, settings)
-    result = await pipeline.process_payload(payload, "http")
+    owner = await device_owner(payload.node_id, x_device_key, settings)
+    try:
+        result = await pipeline.process_payload(payload, "http", owner["id"] if owner else None)
+    except pipeline.NodeOwnershipError as exc:
+        raise HTTPException(409, str(exc))
     return {"ok": True, **result}
 
 
@@ -176,9 +200,9 @@ async def list_events(
     sort: Literal["newest", "oldest"] = "newest",
     page: int = Query(1, ge=1), page_size: int = Query(25, ge=1, le=200),
 ):
-    f = alert_query(type=type, parameter=parameter, node_id=node_id, severity=severity, status=status,
-                    notification_status=notification_status, active=active, q=q,
-                    date_from=date_from, date_to=date_to)
+    f = _restrict(alert_query(type=type, parameter=parameter, node_id=node_id, severity=severity, status=status,
+                              notification_status=notification_status, active=active, q=q,
+                              date_from=date_from, date_to=date_to), await visible_node_ids(user))
     coll = get_db().alert_events
     total = await coll.count_documents(f)
     items = await coll.find(f, {"_id": 0, "dedupe_key": 0}).sort("created_at", -1 if sort == "newest" else 1) \
@@ -209,7 +233,7 @@ async def acknowledge(event_id: str, body: Optional[AckRequest] = None, user: di
 # ---- nodes -----------------------------------------------------------------------
 @router.get("/nodes")
 async def list_nodes(user: dict = Depends(current_user), settings: Settings = Depends(get_settings)):
-    nodes = await get_db().sensor_nodes.find({}, {"_id": 0}).sort("node_id", 1).to_list(None)
+    nodes = await get_db().sensor_nodes.find(_restrict({}, await visible_node_ids(user)), {"_id": 0}).sort("node_id", 1).to_list(None)
     return {"items": [_node_view(n, settings) for n in nodes]}
 
 
@@ -218,8 +242,8 @@ async def node_detail(node_id: str, user: dict = Depends(current_user), settings
                       points: int = Query(120, ge=10, le=1000)):
     db = get_db()
     node = await db.sensor_nodes.find_one({"node_id": node_id.upper()}, {"_id": 0})
-    if not node:
-        raise HTTPException(404, "Sensor node not found")
+    if not node or (user.get("role") != "admin" and node.get("owner_id") != user["id"]):
+        raise HTTPException(404, "Sensor node not found")  # someone else's node looks the same as no node
     thresholds = await get_thresholds()
     series = {}
     for p in PARAMETERS:

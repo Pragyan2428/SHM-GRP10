@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
-import { ADMIN } from './env.js'
-import { ingest, login, logout, uniqueNode } from './helpers.js'
+import { ADMIN, API_PORT, DEVICE_KEY } from './env.js'
+import { ingest, login, logout, myDeviceKey, uniqueNode } from './helpers.js'
 
 const PASSWORD = 'Profile-Pass-0001'
 
@@ -130,8 +130,8 @@ test('the admin profile card has dashboard shortcuts', async ({ page }) => {
 
 test('the user dashboard has the sidebar, KPI cards, chart, node table and map', async ({ page, request }) => {
   const node = uniqueNode()
-  await ingest(request, node, { strain: 350, vibration: 0.5, temperature: 26 })
   await newUser(page)
+  await ingest(request, node, { strain: 350, vibration: 0.5, temperature: 26 }, await myDeviceKey(page))
   await expect(page.getByTestId('page-title')).toHaveText('Dashboard')
   await expect(page.getByRole('navigation', { name: 'Dashboard sections' })).toBeVisible()
   for (const p of ['strain', 'vibration', 'temperature']) await expect(page.getByTestId(`ud-kpi-${p}`)).toBeVisible()
@@ -146,4 +146,34 @@ test('the user dashboard has the sidebar, KPI cards, chart, node table and map',
   await expect(page.locator('[data-testid^="user-node-card-"]')).toHaveCount(1)
   await page.getByTestId('ud-search').fill('no-such-node')
   await expect(page.getByTestId('user-empty-state')).toBeVisible()
+})
+
+test('a new account sees only how to connect its ESP32, then only its own node', async ({ page, request }) => {
+  const others = uniqueNode()
+  await ingest(request, others, { strain: 400 }) // a node of the site, not of this account
+  await newUser(page, 'Fresh Account')
+  const empty = page.getByTestId('user-no-nodes')
+  await expect(empty).toBeVisible()
+  await expect(page.getByTestId('ud-map')).toHaveCount(0) // no building until a node of theirs reports
+  await expect(page.getByTestId('device-secrets')).toContainText(`${new URL(page.url()).origin}/api/ingest`)
+  await expect(page.getByTestId('device-key')).toContainText('••••') // hidden until asked
+  await page.getByTestId('device-key-toggle').click()
+  const key = await myDeviceKey(page)
+  await expect(page.getByTestId('device-key')).toHaveText(key)
+  await expect(page.getByTestId('device-secrets')).toContainText(key)
+
+  const mine = uniqueNode()
+  await ingest(request, mine, { strain: 300 }, key)
+  await expect(page.getByTestId(`user-node-card-${mine}`)).toBeVisible({ timeout: 15_000 }) // appears on its own
+  await expect(page.getByTestId(`user-node-card-${others}`)).toHaveCount(0)
+  await expect(page.getByTestId('ud-map').getByTestId(`map-pin-${mine.toLowerCase()}`)).toBeVisible()
+  await expect(page.locator('[data-testid^="user-node-card-"]')).toHaveCount(1)
+  await expect(page.getByTestId('connect-device')).toContainText('Connect another ESP32')
+
+  // nobody else can send as this node, not even with the site-wide key
+  const r = await request.post(`http://127.0.0.1:${API_PORT}/api/ingest`, {
+    headers: { 'X-Device-Key': DEVICE_KEY }, data: { node_id: mine, readings: { strain: 1 } },
+  })
+  expect(r.status()).toBe(409)
+  expect((await r.json()).detail).toContain('different NODE_ID')
 })

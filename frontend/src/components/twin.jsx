@@ -10,40 +10,82 @@ import { Badge } from './ui'
 const STATUS_COLOR = { nominal: '#2fd17a', warning: '#f5a524', critical: '#ff4d4f', offline: '#6f7683' }
 
 /* ------------------------------------------------------------ isometric maths */
+// The building is drawn from the nodes that report: as many storeys as their floors need,
+// each node pinned on its own floor. A node's floor comes from the API (sent by the device
+// or read from its location text); nodes without one stand beside the building.
 const S = 34 // px per metre-ish unit
 const CX = 271
 const CY = 272
 const W = 6 // building width (3 bays of 2)
 const D = 4 // building depth
-const STOREY = 1.5
-const STOREYS = 4
-const H = STOREY * STOREYS
 const P = 1.2 // platform margin
-const TANK = { x0: 3.6, x1: 5, y0: 0.8, y1: 2, h: 1 }
-export const FLOOR_NAMES = ['GF', '1F', '2F', '3F', 'Roof']
-
-const iso = (x, y, z) => [CX + (x - y) * 0.866 * S, CY + (x + y) * 0.5 * S - z * S]
-const pts = (arr) => arr.map((p) => iso(...p).map((n) => n.toFixed(1)).join(',')).join(' ')
-const faceL = (y, x0, x1, z0, z1) => pts([[x0, y, z0], [x1, y, z0], [x1, y, z1], [x0, y, z1]]) // plane y = const
-const faceR = (x, y0, y1, z0, z1) => pts([[x, y0, z0], [x, y1, z0], [x, y1, z1], [x, y0, z1]]) // plane x = const
-const faceT = (z, x0, x1, y0, y1) => pts([[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]]) // plane z = const
+const MAX_H = 6.6 // height budget: taller buildings get thinner storeys
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
-const OTHER_LABEL = iso(W + 0.6, -1.6, 0)
 
-// Where a node sits on the building. map_x / map_y come from the elevation layout
-// (building spans x 25-75, ground at y 82.5, roof at y 17.5).
-function placeNode(n, otherIndex) {
-  if (n.map_x == null || n.map_y == null) {
-    const col = Math.floor(otherIndex / 6)
-    return { other: true, floor: null, xy: iso(W + 0.6 + col * 0.9, -0.7 + (otherIndex % 6) * 1.05, 0) }
+export const floorName = (f) => (f === 'roof' ? 'Roof' : f === 0 ? 'GF' : f < 0 ? `B${-f}` : `${f}F`)
+const floorKey = (f) => (f == null ? null : String(f))
+
+function geometry(layout) {
+  const cy = CY - ((MAX_H - layout.H) * S) / 2 // keep short buildings vertically centred
+  const iso = (x, y, z) => [CX + (x - y) * 0.866 * S, cy + (x + y) * 0.5 * S - z * S]
+  const pts = (arr) => arr.map((p) => iso(...p).map((n) => n.toFixed(1)).join(',')).join(' ')
+  return {
+    iso,
+    pts,
+    faceL: (y, x0, x1, z0, z1) => pts([[x0, y, z0], [x1, y, z0], [x1, y, z1], [x0, y, z1]]), // plane y = const
+    faceR: (x, y0, y1, z0, z1) => pts([[x, y0, z0], [x, y1, z0], [x, y1, z1], [x, y0, z1]]), // plane x = const
+    faceT: (z, x0, x1, y0, y1) => pts([[x0, y0, z], [x1, y0, z], [x1, y1, z], [x0, y1, z]]), // plane z = const
   }
-  const x = clamp(((n.map_x - 25) / 50) * W, 0.15, W - 0.15)
-  const z = ((330 - n.map_y * 4) / 260) * H
-  if (z > H) {
-    return { other: false, tank: true, floor: 4, x, z, xy: iso(clamp(x, TANK.x0 + 0.2, TANK.x1 - 0.2), TANK.y1, Math.min(z, H + TANK.h - 0.2)) }
-  }
-  const zc = clamp(z, 0.12, H - 0.1)
-  return { other: false, floor: clamp(Math.floor(zc / STOREY), 0, STOREYS - 1), bay: clamp(Math.floor(x / 2), 0, 2), x, z: zc, xy: iso(x, D, zc) }
+}
+
+function buildLayout(nodes) {
+  const nums = nodes.map((n) => n.floor).filter((f) => typeof f === 'number')
+  const low = Math.min(0, ...nums)
+  const high = Math.max(0, ...nums)
+  const storeys = high - low + 1
+  const storey = Math.min(1.5, MAX_H / storeys)
+  const floors = [...new Set(nums)].sort((a, b) => a - b)
+  if (nodes.some((n) => n.floor === 'roof')) floors.push('roof')
+  return { low, high, storeys, storey, H: storeys * storey, floors, known: floors.length > 0 }
+}
+
+// Positions for every node on the drawing, plus the building layout they imply.
+export function placeNodes(nodes) {
+  const layout = buildLayout(nodes)
+  const g = geometry(layout)
+  const groups = new Map()
+  nodes.forEach((n) => {
+    const k = floorKey(n.floor)
+    if (k != null) groups.set(k, [...(groups.get(k) || []), n])
+  })
+  let other = 0
+  const placed = Object.fromEntries(nodes.map((n) => {
+    if (n.floor == null) {
+      const i = other++
+      const col = Math.floor(i / 6)
+      return [n.node_id, { other: true, floor: null, xy: g.iso(W + 0.6 + col * 0.9, -0.7 + (i % 6) * 1.05, 0) }]
+    }
+    const group = groups.get(floorKey(n.floor))
+    const i = group.indexOf(n)
+    const k = group.length
+    const step = typeof n.floor === 'number' ? n.floor - layout.low : 0
+    // spread the floor's nodes along the facade; stagger floor by floor so pins on
+    // neighbouring floors don't sit on top of each other
+    const x = k === 1 ? [3, 1.3, 4.7][step % 3] : clamp((W * (i + 1)) / (k + 1) + (step % 2 ? 0.25 : -0.25) * (W / (k + 1)), 0.4, W - 0.4)
+    const half = Math.min(1, W / (k + 1) / 2)
+    const span = { x0: clamp(x - half, 0, W), x1: clamp(x + half, 0, W) }
+    if (n.floor === 'roof') return [n.node_id, { other: false, roof: true, floor: 'roof', x, ...span, xy: g.iso(x, D / 2, layout.H) }]
+    const level = n.floor - layout.low
+    return [n.node_id, { other: false, floor: n.floor, level, x, ...span, xy: g.iso(x, D, (level + 0.5) * layout.storey) }]
+  }))
+  return { placed, layout }
+}
+
+export function describeFloors(layout) {
+  if (!layout.known) return 'Not given by the nodes'
+  const nums = layout.floors.filter((f) => f !== 'roof')
+  const range = nums.length ? (layout.low === layout.high ? floorName(layout.low) : `${floorName(layout.low)}–${floorName(layout.high)}`) : ''
+  return [range, layout.floors.includes('roof') ? 'roof' : ''].filter(Boolean).join(' + ')
 }
 
 function criticalParams(n, params) {
@@ -51,21 +93,39 @@ function criticalParams(n, params) {
 }
 
 /* ------------------------------------------------------------ the drawing */
-export function IsoBuilding({ nodes, params, placed, selectedId, floor, onSelect }) {
+export function IsoBuilding({ nodes, params, view, selectedId, floor, onSelect }) {
+  const { placed, layout } = view
+  const { iso, pts, faceL, faceR, faceT } = geometry(layout)
+  const { storeys, storey, H, low } = layout
   const grid = []
   for (let i = Math.ceil(-P); i <= W + P; i += 1) grid.push(pts([[i, -P, 0], [i, D + P, 0]]))
   for (let j = Math.ceil(-P); j <= D + P; j += 1) grid.push(pts([[-P, j, 0], [W + P, j, 0]]))
+  const ground = -low // storey index of the ground floor
   const windowsL = []
   const windowsR = []
-  for (let k = 0; k < STOREYS; k += 1) {
-    for (let b = 0; b < 3; b += 1) {
-      if (!(k === 0 && b === 1)) windowsL.push({ key: `${k}${b}`, lit: (k * 3 + b) % 4 === 1, poly: faceL(D, b * 2 + 0.4, b * 2 + 1.6, k * STOREY + 0.42, k * STOREY + 1.12) })
-    }
-    for (let b = 0; b < 2; b += 1) {
-      windowsR.push({ key: `${k}${b}`, lit: (k + b) % 3 === 2, poly: faceR(W, b * 2 + 0.4, b * 2 + 1.6, k * STOREY + 0.42, k * STOREY + 1.12) })
+  if (storey >= 0.6) {
+    for (let k = 0; k < storeys; k += 1) {
+      const z0 = k * storey + storey * 0.28
+      const z1 = k * storey + storey * 0.75
+      for (let b = 0; b < 3; b += 1) {
+        if (!(k === ground && b === 1)) windowsL.push({ key: `${k}${b}`, lit: (k * 3 + b) % 4 === 1, poly: faceL(D, b * 2 + 0.4, b * 2 + 1.6, z0, z1) })
+      }
+      for (let b = 0; b < 2; b += 1) {
+        windowsR.push({ key: `${k}${b}`, lit: (k + b) % 3 === 2, poly: faceR(W, b * 2 + 0.4, b * 2 + 1.6, z0, z1) })
+      }
     }
   }
+  const slabStep = Math.max(1, Math.ceil(storeys / 30))
+  const slabs = []
+  for (let k = slabStep; k < storeys; k += slabStep) slabs.push(k)
+  const labelled = layout.floors.filter((f) => f !== 'roof')
+  const fkey = floorKey(floor)
   const alerts = nodes.filter((n) => n.online && (n.condition === 'critical' || n.condition === 'warning') && !placed[n.node_id].other)
+  const band = (pl) => (pl.roof
+    ? faceT(H + 0.01, pl.x0, pl.x1, 0.3, D - 0.3)
+    : faceL(D, pl.x0, pl.x1, pl.level * storey, (pl.level + 1) * storey))
+  const otherLabel = iso(W + 0.6, -1.6, 0)
+  const centre = iso(W / 2, D / 2, H / 2)
 
   return (
     <svg className="twin-svg" viewBox="0 0 600 520" role="group" aria-label="Building digital twin with sensor locations">
@@ -81,43 +141,51 @@ export function IsoBuilding({ nodes, params, placed, selectedId, floor, onSelect
       <polygon points={faceL(D + P, -P, W + P, -0.45, 0)} fill="#0f1114" stroke="rgba(255,255,255,.06)" />
       <polygon points={faceR(W + P, -P, D + P, -0.45, 0)} fill="#0b0c0e" stroke="rgba(255,255,255,.06)" />
 
-      {/* building */}
+      {/* building: one storey per floor the nodes report */}
       <polygon points={faceR(W, 0, D, 0, H)} fill="url(#tw-right)" stroke="#3a4048" />
       <polygon points={faceL(D, 0, W, 0, H)} fill="url(#tw-left)" stroke="#444b54" />
       {windowsR.map((w) => <polygon key={`r${w.key}`} points={w.poly} fill={w.lit ? 'rgba(255,170,90,.16)' : '#0c0e11'} stroke="#2a3037" />)}
       {windowsL.map((w) => <polygon key={`l${w.key}`} points={w.poly} fill={w.lit ? 'rgba(255,170,90,.2)' : '#0c0e11'} stroke="#323840" />)}
-      <polygon points={faceL(D, 2.62, 3.38, 0, 1.05)} fill="#08090b" stroke="#323840" />
+      <polygon points={faceL(D, 2.62, 3.38, ground * storey, ground * storey + Math.min(1.05, storey * 0.7))} fill="#08090b" stroke="#323840" />
       {[0, 2, 4, 6].map((x) => <polygon key={`cl${x}`} points={faceL(D, x - 0.06, x + 0.06, 0, H)} fill="#3b4149" />)}
       {[0, 2, 4].map((y) => <polygon key={`cr${y}`} points={faceR(W, y - 0.06, y + 0.06, 0, H)} fill="#2b3037" />)}
-      {[1, 2, 3].map((k) => (
+      {slabs.map((k) => (
         <g key={`fl${k}`}>
-          <polygon points={faceL(D, 0, W, k * STOREY - 0.07, k * STOREY + 0.07)} fill="#454c56" />
-          <polygon points={faceR(W, 0, D, k * STOREY - 0.07, k * STOREY + 0.07)} fill="#30353d" />
+          <polygon points={faceL(D, 0, W, k * storey - 0.05, k * storey + 0.05)} fill="#454c56" />
+          <polygon points={faceR(W, 0, D, k * storey - 0.05, k * storey + 0.05)} fill="#30353d" />
         </g>
       ))}
       <polygon points={faceT(H, 0, W, 0, D)} fill="#2b3037" stroke="#4d545e" />
       <polygon points={faceT(H + 0.01, 0.2, W - 0.2, 0.2, D - 0.2)} fill="none" stroke="rgba(255,255,255,.08)" />
-      {/* roof water tank */}
-      <polygon points={faceR(TANK.x1, TANK.y0, TANK.y1, H, H + TANK.h)} fill="#1a1d22" stroke="#4d545e" />
-      <polygon points={faceL(TANK.y1, TANK.x0, TANK.x1, H, H + TANK.h)} fill="#262a31" stroke="#4d545e" />
-      <polygon points={faceT(H + TANK.h, TANK.x0, TANK.x1, TANK.y0, TANK.y1)} fill="#353b43" stroke="#5a626c" />
+
+      {/* floor names for the floors that have sensors, painted along their band of the facade */}
+      {labelled.map((f) => {
+        const [x, y] = iso(0.08, D, (f - low + 0.5) * storey)
+        const size = Math.max(7, Math.min(9.5, storey * S * 0.5))
+        return (
+          <text key={`lbl${f}`} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(30)`} dy={size * 0.35} fill="#8a919c" fontSize={size}
+            fontWeight="600" fontFamily="JetBrains Mono, monospace" pointerEvents="none" data-testid={`twin-floor-label-${floorName(f).toLowerCase()}`}>
+            {floorName(f)}
+          </text>
+        )
+      })}
 
       {/* floor filter highlight */}
-      {floor != null && floor < STOREYS ? (
+      {fkey != null && fkey !== 'roof' ? (
         <g pointerEvents="none">
-          <polygon points={faceL(D, 0, W, floor * STOREY, (floor + 1) * STOREY)} fill="rgba(255,255,255,.07)" stroke="rgba(255,255,255,.35)" />
-          <polygon points={faceR(W, 0, D, floor * STOREY, (floor + 1) * STOREY)} fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.25)" />
+          <polygon points={faceL(D, 0, W, (floor - low) * storey, (floor - low + 1) * storey)} fill="rgba(255,255,255,.07)" stroke="rgba(255,255,255,.35)" />
+          <polygon points={faceR(W, 0, D, (floor - low) * storey, (floor - low + 1) * storey)} fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.25)" />
         </g>
+      ) : fkey === 'roof' ? (
+        <polygon points={faceT(H + 0.01, 0, W, 0, D)} fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.35)" pointerEvents="none" />
       ) : null}
 
-      {/* problem areas: the bay / storey around each warning or critical node glows */}
+      {/* problem areas: the part of the floor around each warning or critical node glows */}
       {alerts.map((n) => {
         const pl = placed[n.node_id]
         const crit = n.condition === 'critical'
         const color = crit ? '#ff4d4f' : '#f5a524'
-        const poly = pl.tank
-          ? faceL(TANK.y1, TANK.x0, TANK.x1, H, H + TANK.h)
-          : faceL(D, pl.bay * 2, pl.bay * 2 + 2, pl.floor * STOREY, (pl.floor + 1) * STOREY)
+        const poly = band(pl)
         return (
           <g key={`hl${n.node_id}`} pointerEvents="none" data-testid={`twin-highlight-${n.node_id.toLowerCase()}`}>
             <polygon points={poly} fill={color} opacity={crit ? 0.45 : 0.25} filter="url(#tw-glow)" />
@@ -133,12 +201,12 @@ export function IsoBuilding({ nodes, params, placed, selectedId, floor, onSelect
         const cond = n.online ? n.condition : 'offline'
         const color = STATUS_COLOR[cond] || STATUS_COLOR.nominal
         const isSel = selectedId === n.node_id
-        const dim = floor != null && pl.floor !== floor
+        const dim = fkey != null && floorKey(pl.floor) !== fkey
         return (
           <g key={n.node_id} className="map-pin" transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`} role="button" tabIndex={0}
             opacity={dim ? 0.25 : 1}
             aria-label={`Sensor ${i + 1}, ${n.node_id}, ${n.location}, status ${cond}`} aria-pressed={isSel}
-            data-testid={`map-pin-${n.node_id.toLowerCase()}`} data-status={cond}
+            data-testid={`map-pin-${n.node_id.toLowerCase()}`} data-status={cond} data-floor={floorKey(pl.floor) ?? 'unknown'}
             onClick={() => onSelect(n.node_id)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(n.node_id) } }}>
             <title>{`${n.node_id} — ${n.location}`}</title>
@@ -152,7 +220,12 @@ export function IsoBuilding({ nodes, params, placed, selectedId, floor, onSelect
         )
       })}
       {nodes.some((n) => placed[n.node_id].other) ? (
-        <text x={OTHER_LABEL[0]} y={OTHER_LABEL[1]} textAnchor="middle" fill="#6f7683" fontSize="11" fontFamily="Inter, sans-serif">Other nodes</text>
+        <text x={otherLabel[0]} y={otherLabel[1]} textAnchor="middle" fill="#6f7683" fontSize="11" fontFamily="Inter, sans-serif" data-testid="twin-unplaced-label">Floor not given</text>
+      ) : null}
+      {nodes.length === 0 ? (
+        <text x={centre[0]} y={centre[1]} textAnchor="middle" fill="#a7adb7" fontSize="13" fontFamily="Inter, sans-serif" data-testid="twin-empty">
+          No sensor nodes connected yet
+        </text>
       ) : null}
 
       {/* WARNING tags for limit breaches, like a callout on the drawing */}
@@ -214,10 +287,7 @@ export function DigitalTwin({ t }) {
   const [selected, setSelected] = useState(null)
   const [floor, setFloor] = useState(null)
   const nodes = useMemo(() => [...(t.nodes || [])].sort((a, b) => a.node_id.localeCompare(b.node_id)), [t.nodes])
-  const placed = useMemo(() => {
-    let other = 0
-    return Object.fromEntries(nodes.map((n) => [n.node_id, placeNode(n, (n.map_x == null || n.map_y == null) ? other++ : 0)]))
-  }, [nodes])
+  const view = useMemo(() => placeNodes(nodes), [nodes])
   const fallback = nodes.find((n) => n.online && n.condition === 'critical') || nodes.find((n) => n.online && n.condition === 'warning') || nodes[0]
   const sel = nodes.find((n) => n.node_id === selected) || fallback
   const sys = t.system_status || 'nominal'
@@ -228,13 +298,13 @@ export function DigitalTwin({ t }) {
       <div className="twin-top">
         <div>
           <h2 id="twin-title">Digital twin</h2>
-          <p className="small muted">{t.structure_name} · {t.total_nodes} ESP32 nodes · tap a sensor for its readings</p>
+          <p className="small muted">{t.structure_name} · {t.total_nodes} sensor node{t.total_nodes === 1 ? '' : 's'} · tap a sensor for its readings</p>
         </div>
         <div className="pill-tabs" role="group" aria-label="Show floor">
-          {[null, 0, 1, 2, 3, 4].map((f) => (
+          {[null, ...view.layout.floors].map((f) => (
             <button key={f ?? 'all'} type="button" className="pill-tab" aria-pressed={floor === f} onClick={() => setFloor(f)}
-              data-testid={`twin-floor-${f == null ? 'all' : FLOOR_NAMES[f].toLowerCase()}`}>
-              {f == null ? 'All floors' : FLOOR_NAMES[f]}
+              data-testid={`twin-floor-${f == null ? 'all' : floorName(f).toLowerCase()}`}>
+              {f == null ? 'All floors' : floorName(f)}
             </button>
           ))}
         </div>
@@ -244,7 +314,7 @@ export function DigitalTwin({ t }) {
         <div className="twin-side">
           <GlassPanel title="Building data" icon={Building2} testid="twin-building-data">
             <Row k="Building">{t.structure_name}</Row>
-            <Row k="Floors">G + 3 and roof</Row>
+            <Row k="Floors with sensors" testid="twin-floors">{describeFloors(view.layout)}</Row>
             <Row k="Sensor nodes" testid="status-active-nodes">
               <span className={t.active_nodes < t.total_nodes ? 'c-warning' : ''}>{t.active_nodes}/{t.total_nodes} online</span>
             </Row>
@@ -262,7 +332,7 @@ export function DigitalTwin({ t }) {
         </div>
 
         <div className="twin-stage" data-testid="structural-map">
-          <IsoBuilding nodes={nodes} params={t.parameters} placed={placed} selectedId={sel?.node_id} floor={floor} onSelect={setSelected} />
+          <IsoBuilding nodes={nodes} params={t.parameters} view={view} selectedId={sel?.node_id} floor={floor} onSelect={setSelected} />
           <div className="map-legend twin-legend" aria-hidden="true">
             <span><span className="dot nominal" />Nominal</span>
             <span><span className="dot warning" />Warning</span>
@@ -421,10 +491,4 @@ export function SensorHealth({ t }) {
       <div className="xs dim" style={{ padding: '0 16px 14px' }}>Each column is a node (strain, vibration, temperature from top).</div>
     </section>
   )
-}
-
-// Positions for every node on the building drawing (nodes without a set position go beside it).
-export function placeNodes(nodes) {
-  let other = 0
-  return Object.fromEntries(nodes.map((n) => [n.node_id, placeNode(n, (n.map_x == null || n.map_y == null) ? other++ : 0)]))
 }

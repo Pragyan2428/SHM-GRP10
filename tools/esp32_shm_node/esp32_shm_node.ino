@@ -37,7 +37,8 @@
 #endif
 
 const char* NODE_ID   = "ESP32-07";             // must be unique; ESP32-01..06 are the simulator's
-const char* LOCATION  = "Ground floor - column C2";  // shown on the dashboard
+const char* LOCATION  = "Ground floor - column C2";  // shown on the dashboard; start with the floor
+                                                // ("2nd floor - ...", "Roof - ...") to pin it on the building
 const char* FIRMWARE  = "1.1.0";
 const uint32_t SEND_EVERY_MS = 5000;            // keep under 30 s or the node shows as offline
 

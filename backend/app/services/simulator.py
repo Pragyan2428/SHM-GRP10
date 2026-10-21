@@ -18,8 +18,8 @@ from .thresholds import DEFAULTS, PARAMETERS
 
 log = logging.getLogger("shm.simulator")
 
-# Six nodes on a four-storey building (ground floor + 3 floors + roof). x/y are positions
-# (0-100) on the building elevation drawn by the dashboard map.
+# Six demo nodes on a G+3 building with a roof. The dashboard places each node on the floor named
+# at the start of its location; x/y are only kept for older dashboards.
 NODES = [
     {"node_id": "ESP32-01", "location": "Foundation - column C1 footing, north-west corner", "x": 25.5, "y": 81, "firmware": "2.3.1"},
     {"node_id": "ESP32-02", "location": "Ground floor - column C3, mid-height", "x": 58.3, "y": 74, "firmware": "2.3.1"},

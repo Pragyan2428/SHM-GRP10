@@ -8,8 +8,9 @@ hardware. Standard library only.
     python tools/dummy_esp32.py --url http://10.7.209.43:8000/api/ingest
     python tools/dummy_esp32.py --breach-every 12                 # strain alert every 12th reading
 
-The device key comes from SHM_DEVICE_KEY, or else from backend/.env (a DEVICE_KEYS entry
-for this node, then DEVICE_SHARED_KEY). Stop with Ctrl+C.
+The device key comes from --key (your personal key from the website, so the node shows up
+on your own dashboard), SHM_DEVICE_KEY, or else backend/.env (a DEVICE_KEYS entry for this
+node, then DEVICE_SHARED_KEY). Stop with Ctrl+C.
 """
 from __future__ import annotations
 
@@ -90,14 +91,16 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--url", default="http://127.0.0.1:8000/api/ingest")
     ap.add_argument("--node", default="ESP32-DUMMY", help="node_id (letters, digits, - or _, max 32)")
-    ap.add_argument("--location", default="Test bench - dummy node (lab bench beside the building)")
+    ap.add_argument("--key", help="device key; use your personal key from the website's Connect your ESP32 card")
+    ap.add_argument("--location", default="Ground floor - test bench (dummy node)",
+                    help='where the node is; start with the floor, e.g. "3rd floor - column C2" or "Roof - tank frame"')
     ap.add_argument("--interval", type=float, default=5.0, help="seconds between readings")
     ap.add_argument("--breach-every", type=int, default=0, metavar="N",
                     help="send a strain reading over the limit every Nth message (0 = never)")
     ap.add_argument("--count", type=int, default=0, help="stop after this many messages (0 = run forever)")
     args = ap.parse_args()
 
-    key = device_key(args.node)
+    key = args.key or device_key(args.node)
     node = Node(random.Random())
     print(f"Dummy node {args.node} -> {args.url} every {args.interval:g}s (Ctrl+C to stop)", flush=True)
     sent = 0

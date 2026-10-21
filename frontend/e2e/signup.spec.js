@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { ingest, login, logout, uniqueNode } from './helpers.js'
+import { ingest, login, logout, myDeviceKey, uniqueNode } from './helpers.js'
 
 const PASSWORD = 'E2E-Signup-Pass-01'
 const newEmail = () => `e2e-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}@gmail.com`
@@ -22,15 +22,19 @@ test('login page links to sign up and back', async ({ page }) => {
 })
 
 test('a new user signs up, lands on the readings page and can log in again', async ({ page, request }) => {
-  const node = uniqueNode()
-  await ingest(request, node, { strain: 321.5 })
+  const site = uniqueNode()
+  await ingest(request, site, { strain: 111.1 }) // the site's own node: not this user's
   const email = newEmail()
 
   await page.goto('/signup')
   await fillSignup(page, { name: 'Field Engineer', email })
   await expect(page).toHaveURL(/\/user$/)
   await expect(page.getByTestId('user-current-user')).toHaveText('Field Engineer')
-  await expect(page.getByTestId(`user-reading-${node}-strain`)).toContainText('321.5')
+  await expect(page.getByTestId('user-no-nodes')).toBeVisible() // starts empty, with the Connect card
+  const node = uniqueNode()
+  await ingest(request, node, { strain: 321.5 }, await myDeviceKey(page))
+  await expect(page.getByTestId(`user-reading-${node}-strain`)).toContainText('321.5', { timeout: 15_000 })
+  await expect(page.getByTestId(`user-node-card-${site}`)).toHaveCount(0)
 
   await logout(page)
   await expect(page.getByTestId('login-page')).toBeVisible()

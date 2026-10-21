@@ -86,6 +86,12 @@ async def update_notification_settings(body: NotificationSettings, user: dict = 
     return {"settings": saved}
 
 
+@router.post("/notifications/telegram/chats")
+async def telegram_chats(user: dict = Depends(require_admin)):
+    """Chats that have messaged the bot (press Start in Telegram first), to add as recipients."""
+    return await notifications.find_telegram_chats()
+
+
 @router.post("/notifications/test")
 async def test_notification(body: NotificationTest, user: dict = Depends(require_admin)):
     result = await notifications.send_test(body.channel)
@@ -189,8 +195,12 @@ async def google_sheets_sync(user: dict = Depends(require_admin)):
 # ---- users -----------------------------------------------------------------------
 @router.get("/users")
 async def list_users(user: dict = Depends(require_admin)):
-    users = await get_db().users.find({}, {"_id": 0}).sort("created_at", 1).to_list(None)
-    return {"items": clean([public_user(u) for u in users])}
+    db = get_db()
+    users = await db.users.find({}, {"_id": 0}).sort("created_at", 1).to_list(None)
+    counts: dict = {}
+    for n in await db.sensor_nodes.find({"owner_id": {"$ne": None}}, {"_id": 0, "owner_id": 1}).to_list(None):
+        counts[n["owner_id"]] = counts.get(n["owner_id"], 0) + 1
+    return {"items": clean([{**public_user(u), "node_count": counts.get(u["id"], 0)} for u in users])}
 
 
 @router.post("/users", status_code=201)

@@ -138,9 +138,11 @@ class NotificationSettings(BaseModel):
     email_enabled: Optional[bool] = None
     sms_enabled: Optional[bool] = None
     whatsapp_enabled: Optional[bool] = None
+    telegram_enabled: Optional[bool] = None
     email_recipients: Optional[list[EmailStr]] = Field(default=None, max_length=20)
     sms_recipients: Optional[list[str]] = Field(default=None, max_length=20)
     whatsapp_recipients: Optional[list[str]] = Field(default=None, max_length=20)
+    telegram_recipients: Optional[list[str]] = Field(default=None, max_length=20)
     min_severity: Optional[Literal["early_warning", "major", "critical"]] = None
     cooldown_seconds: Optional[int] = Field(default=None, ge=0, le=86400)
 
@@ -159,8 +161,23 @@ class NotificationSettings(BaseModel):
         return out
 
 
+    @field_validator("telegram_recipients")
+    @classmethod
+    def _chats(cls, v):
+        if v is None:
+            return v
+        import re
+        out = []
+        for c in v:
+            c = str(c).strip()
+            if not re.fullmatch(r"-?\d{3,20}|@[A-Za-z][A-Za-z0-9_]{4,31}", c):
+                raise ValueError(f"'{c}' is not a Telegram chat ID (a number such as 123456789, or @channelname)")
+            out.append(c)
+        return out
+
+
 class NotificationTest(BaseModel):
-    channel: Literal["email", "sms", "whatsapp"]
+    channel: Literal["email", "sms", "whatsapp", "telegram"]
 
 
 class SheetsSettings(BaseModel):
@@ -188,3 +205,31 @@ class CsvExportRequest(BaseModel):
 class MqttTest(BaseModel):
     topic: Optional[str] = Field(default=None, max_length=120)
     payload: Optional[dict] = None
+
+
+# ---- sensor nodes registered by an administrator ------------------------------------------------
+class _NodeFields(BaseModel):
+    location: Optional[str] = Field(default=None, max_length=120)
+    # null = read the floor from the location text; 0 = ground, -1 = basement, "roof"
+    floor: Optional[Union[int, str]] = None
+    plan_x: Optional[float] = Field(default=None, ge=0, le=100)  # spot on the floor plan, % from the left
+    plan_y: Optional[float] = Field(default=None, ge=0, le=100)  # % from the top
+    owner_id: Optional[str] = Field(default=None, max_length=64)  # null / "" = the site's own device
+
+    @field_validator("floor", mode="before")
+    @classmethod
+    def _floor(cls, v):
+        return normalise_floor(v)
+
+
+class NodeCreate(_NodeFields):
+    node_id: str = Field(pattern=NODE_ID_PATTERN)
+
+    @field_validator("node_id")
+    @classmethod
+    def _upper(cls, v: str) -> str:
+        return v.upper()
+
+
+class NodeUpdate(_NodeFields):
+    pass

@@ -23,16 +23,18 @@ from .thresholds import SEVERITY_RANK
 
 log = logging.getLogger("shm.notifications")
 
-CHANNELS = ("email", "sms", "whatsapp")
+CHANNELS = ("email", "sms", "whatsapp", "telegram")
 
 DEFAULT_SETTINGS = {
     "browser_enabled": True,
     "email_enabled": True,
     "sms_enabled": True,
     "whatsapp_enabled": True,
+    "telegram_enabled": True,
     "email_recipients": [],
     "sms_recipients": [],
     "whatsapp_recipients": [],
+    "telegram_recipients": [],
     "min_severity": "major",
     "cooldown_seconds": 300,
 }
@@ -69,6 +71,9 @@ def provider_status() -> dict:
                      "message": None if s.whatsapp_configured else
                      "Not configured - set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_WHATSAPP_FROM "
                      "(Twilio sandbox: +14155238886)"},
+        "telegram": {"configured": s.telegram_configured, "provider": "telegram" if s.telegram_configured else None,
+                     "message": None if s.telegram_configured else
+                     "Not configured - create a bot with @BotFather in Telegram and set TELEGRAM_BOT_TOKEN"},
     }
 
 
@@ -175,12 +180,62 @@ async def send_whatsapp(recipients: list[str], body: str) -> None:
     await _twilio_messages(recipients, sender, body, prefix="whatsapp:")
 
 
+def _telegram_url(method: str) -> str:
+    return f"https://api.telegram.org/bot{get_settings().telegram_bot_token}/{method}"
+
+
+async def send_telegram(recipients: list[str], body: str) -> None:
+    if not get_settings().telegram_configured:
+        raise NotificationError("Telegram bot not configured")
+    errors = []
+    async with _http_client() as client:
+        for chat in recipients:
+            r = await client.post(_telegram_url("sendMessage"),
+                                  json={"chat_id": chat, "text": body[:4000], "disable_web_page_preview": True})
+            try:
+                data = r.json()
+            except ValueError:
+                data = {}
+            if r.status_code >= 300 or not data.get("ok"):
+                hint = " (open the bot in Telegram and press Start first)" if r.status_code in (400, 403) else ""
+                errors.append(f"{chat}: {data.get('description') or f'HTTP {r.status_code}'}{hint}")
+    if errors:
+        raise NotificationError("; ".join(errors))
+
+
+async def find_telegram_chats() -> dict:
+    """Chats that recently messaged the bot, so an admin can pick theirs instead of looking up IDs."""
+    if not get_settings().telegram_configured:
+        return {"ok": False, "chats": [], "message": provider_status()["telegram"]["message"]}
+    async with _http_client() as client:
+        r = await client.get(_telegram_url("getUpdates"))
+    try:
+        data = r.json()
+    except ValueError:
+        data = {}
+    if r.status_code >= 300 or not data.get("ok"):
+        return {"ok": False, "chats": [], "message": f"Telegram: {data.get('description') or f'HTTP {r.status_code}'}"}
+    chats: dict[str, dict] = {}
+    for update in data.get("result", []):
+        msg = update.get("message") or update.get("channel_post") or update.get("my_chat_member") or {}
+        chat = msg.get("chat") or {}
+        if "id" in chat:
+            name = chat.get("title") or " ".join(x for x in (chat.get("first_name"), chat.get("last_name")) if x)
+            chats[str(chat["id"])] = {"id": str(chat["id"]), "name": name or str(chat["id"]),
+                                      "username": chat.get("username"), "type": chat.get("type")}
+    message = (f"Found {len(chats)} chat(s)" if chats else
+               "No chats yet - open your bot in Telegram, press Start (or send it any message), then try again")
+    return {"ok": True, "chats": list(chats.values()), "message": message}
+
+
 async def _send(channel: str, recipients: list[str], subject: str, body: str) -> None:
-    # Looked up at call time so tests can replace send_email / send_sms / send_whatsapp.
+    # Looked up at call time so tests can replace send_email / send_sms / send_whatsapp / send_telegram.
     if channel == "email":
         await send_email(recipients, subject, body)
     elif channel == "sms":
         await send_sms(recipients, body)
+    elif channel == "telegram":
+        await send_telegram(recipients, body)
     else:
         await send_whatsapp(recipients, body)
 
@@ -255,7 +310,7 @@ async def send_test(channel: str) -> dict:
     cfg = await get_notification_settings()
     status = provider_status()[channel]
     recipients = cfg.get(f"{channel}_recipients") or []
-    name = {"email": "email", "sms": "SMS", "whatsapp": "WhatsApp message"}[channel]
+    name = {"email": "email", "sms": "SMS", "whatsapp": "WhatsApp message", "telegram": "Telegram message"}[channel]
     if not status["configured"]:
         await _log(None, channel, recipients, "disabled", test=True, reason="Integration not configured")
         return {"ok": False, "status": "disabled", "message": status["message"]}

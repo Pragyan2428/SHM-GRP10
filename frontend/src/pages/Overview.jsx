@@ -39,7 +39,7 @@ export default function Overview() {
         </div>
       ) : null}
 
-      <DigitalTwin t={t} />
+      <DigitalTwin t={t} plan />
 
       <section className="metric-grid" aria-label="Sensor parameters" data-testid="metric-cards">
         {t.parameters.map((p, i) => <MetricCard key={p.parameter} p={p} light={i === 1} />)}

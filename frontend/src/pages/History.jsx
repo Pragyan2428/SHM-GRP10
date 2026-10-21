@@ -182,7 +182,7 @@ export default function History() {
                           <Badge value={a.notification_status} testid={`history-notification-status-${a.id}`} />
                           {a.notification_status === 'failed' ? (
                             <div className="xs c-critical break" style={{ marginTop: 3 }}>
-                              {['email', 'sms', 'whatsapp'].filter((c) => a.notifications?.[c]?.status === 'failed').map((c) => `${c}: ${a.notifications[c].error}`).join(' · ')}
+                              {['email', 'sms', 'whatsapp', 'telegram'].filter((c) => a.notifications?.[c]?.status === 'failed').map((c) => `${c}: ${a.notifications[c].error}`).join(' · ')}
                             </div>
                           ) : null}
                         </td>

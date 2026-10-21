@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { KeyRound, Pencil, Trash2, UserPlus } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Building2, KeyRound, Pencil, Trash2, UserPlus } from 'lucide-react'
 import { Badge, Dialog, EmptyState, ErrorState, Loading, PermissionDenied } from '../components/ui'
 import { api } from '../lib/api'
 import { useAuth, useFetch, useToast } from '../lib/context'
@@ -91,7 +92,7 @@ export default function Users() {
   return (
     <>
       <div className="page-head">
-        <div><h1 data-testid="page-title">Users</h1><p>Administrators configure the system; viewers monitor it.</p></div>
+        <div><h1 data-testid="page-title">Users</h1><p>Administrators configure the system; viewers monitor their own ESP32 nodes. Open a user to see their building.</p></div>
         <div className="page-actions">
           <button type="button" className="btn btn-primary" onClick={() => setEditing(null)} data-testid="user-add-button"><UserPlus size={14} aria-hidden="true" /> Add user</button>
         </div>
@@ -99,17 +100,24 @@ export default function Users() {
       <section className="panel">
         {data.items.length === 0 ? <EmptyState title="No users" testid="users-empty-state" /> : (
           <table className="data responsive" data-testid="users-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last login</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Nodes</th><th>Last login</th><th>Actions</th></tr></thead>
             <tbody>
               {data.items.map((u) => (
                 <tr key={u.id} data-testid={`user-row-${slug(u.email)}`}>
-                  <td data-label="Name">{u.name}{u.id === me.id ? <span className="dim small"> (you)</span> : null}</td>
+                  <td data-label="Name">
+                    <Link to={`/users/${u.id}`} data-testid={`user-open-${slug(u.email)}`}>{u.name}</Link>
+                    {u.id === me.id ? <span className="dim small"> (you)</span> : null}
+                  </td>
                   <td data-label="Email" className="mono break">{u.email}</td>
                   <td data-label="Role"><Badge value={u.role} label={u.role === 'admin' ? 'Administrator' : 'Viewer'} /></td>
                   <td data-label="Status"><Badge value={u.active ? 'online' : 'inactive'} label={u.active ? 'Active' : 'Inactive'} /></td>
+                  <td data-label="Nodes" className="num" data-testid={`user-node-count-${slug(u.email)}`}>{u.node_count ?? 0}</td>
                   <td data-label="Last login" className="num">{u.last_login_at ? fmtDateTime(u.last_login_at) : 'Never'}</td>
                   <td data-label="Actions">
                     <div className="row">
+                      <Link to={`/users/${u.id}`} className="btn btn-sm" data-testid={`user-building-button-${slug(u.email)}`} aria-label={`Building of ${u.email}`}>
+                        <Building2 size={13} aria-hidden="true" /> Building
+                      </Link>
                       <button type="button" className="btn btn-sm" onClick={() => setEditing(u)} data-testid={`user-edit-button-${slug(u.email)}`} aria-label={`Edit ${u.email}`}>
                         <Pencil size={13} aria-hidden="true" /> Edit
                       </button>

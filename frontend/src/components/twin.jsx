@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowUpRight, Building2, ChevronDown, Gauge, MapPin, Radio } from 'lucide-react'
-import { PARAMS, PARAM_SHORT, SENSOR, UNITS, fmtAgo, fmtNum, fmtTime, fmtValue } from '../lib/format'
+import { PARAMS, PARAM_SHORT, SENSOR, UNITS, floorName, fmtAgo, fmtNum, fmtTime, fmtValue } from '../lib/format'
+import { FloorPlans } from './FloorPlan'
 import { PARAM_ICON, Sparkline, TrendIcon } from './monitoring'
 import { Badge } from './ui'
 
@@ -22,7 +23,7 @@ const P = 1.2 // platform margin
 const MAX_H = 6.6 // height budget: taller buildings get thinner storeys
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
-export const floorName = (f) => (f === 'roof' ? 'Roof' : f === 0 ? 'GF' : f < 0 ? `B${-f}` : `${f}F`)
+export { floorName }
 const floorKey = (f) => (f == null ? null : String(f))
 
 function geometry(layout) {
@@ -283,7 +284,7 @@ function ReadingSlider({ p, reading, online }) {
   )
 }
 
-export function DigitalTwin({ t }) {
+export function DigitalTwin({ t, plan = false }) {
   const [selected, setSelected] = useState(null)
   const [floor, setFloor] = useState(null)
   const nodes = useMemo(() => [...(t.nodes || [])].sort((a, b) => a.node_id.localeCompare(b.node_id)), [t.nodes])
@@ -297,17 +298,17 @@ export function DigitalTwin({ t }) {
     <section className="twin" aria-labelledby="twin-title" data-testid="digital-twin">
       <div className="twin-top">
         <div>
-          <h2 id="twin-title">Digital twin</h2>
+          <h2 id="twin-title">{plan ? 'Floor plans' : 'Digital twin'}</h2>
           <p className="small muted">{t.structure_name} · {t.total_nodes} sensor node{t.total_nodes === 1 ? '' : 's'} · tap a sensor for its readings</p>
         </div>
-        <div className="pill-tabs" role="group" aria-label="Show floor">
+        {plan ? null : <div className="pill-tabs" role="group" aria-label="Show floor">
           {[null, ...view.layout.floors].map((f) => (
             <button key={f ?? 'all'} type="button" className="pill-tab" aria-pressed={floor === f} onClick={() => setFloor(f)}
               data-testid={`twin-floor-${f == null ? 'all' : floorName(f).toLowerCase()}`}>
               {f == null ? 'All floors' : floorName(f)}
             </button>
           ))}
-        </div>
+        </div>}
       </div>
 
       <div className="twin-body">
@@ -331,8 +332,10 @@ export function DigitalTwin({ t }) {
           </GlassPanel>
         </div>
 
-        <div className="twin-stage" data-testid="structural-map">
-          <IsoBuilding nodes={nodes} params={t.parameters} view={view} selectedId={sel?.node_id} floor={floor} onSelect={setSelected} />
+        <div className={`twin-stage ${plan ? 'plan-stage' : ''}`} data-testid="structural-map">
+          {plan
+            ? <FloorPlans nodes={nodes} selectedId={sel?.node_id} onSelect={setSelected} testid="floor-plans" />
+            : <IsoBuilding nodes={nodes} params={t.parameters} view={view} selectedId={sel?.node_id} floor={floor} onSelect={setSelected} />}
           <div className="map-legend twin-legend" aria-hidden="true">
             <span><span className="dot nominal" />Nominal</span>
             <span><span className="dot warning" />Warning</span>

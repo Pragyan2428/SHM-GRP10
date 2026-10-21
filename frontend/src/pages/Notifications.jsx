@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Bell, Mail, MessageCircle, MessageSquare, Monitor, Save, Send } from 'lucide-react'
+import { Bell, Bot, Mail, MessageCircle, MessageSquare, Monitor, Plus, Save, Search, Send } from 'lucide-react'
 import { Badge, Banner, EmptyState, ErrorState, Loading, PermissionDenied, Toggle } from '../components/ui'
 import { api } from '../lib/api'
 import { useAuth, useFetch, useLive, useToast } from '../lib/context'
@@ -30,6 +30,8 @@ export default function Notifications() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [testing, setTesting] = useState('')
+  const [chats, setChats] = useState(null)
+  const [finding, setFinding] = useState(false)
 
   useEffect(() => {
     if (data?.settings && isAdmin) {
@@ -37,6 +39,8 @@ export default function Notifications() {
       setForm({
         ...s,
         whatsapp_enabled: s.whatsapp_enabled !== false,
+        telegram_enabled: s.telegram_enabled !== false,
+        telegram_recipients: (s.telegram_recipients || []).join('\n'),
         email_recipients: (s.email_recipients || []).join('\n'),
         sms_recipients: (s.sms_recipients || []).join('\n'),
         whatsapp_recipients: (s.whatsapp_recipients || []).join('\n'),
@@ -59,9 +63,9 @@ export default function Notifications() {
         method: 'PUT',
         body: {
           browser_enabled: form.browser_enabled, email_enabled: form.email_enabled, sms_enabled: form.sms_enabled,
-          whatsapp_enabled: form.whatsapp_enabled,
+          whatsapp_enabled: form.whatsapp_enabled, telegram_enabled: form.telegram_enabled,
           email_recipients: lines(form.email_recipients), sms_recipients: lines(form.sms_recipients),
-          whatsapp_recipients: lines(form.whatsapp_recipients),
+          whatsapp_recipients: lines(form.whatsapp_recipients), telegram_recipients: lines(form.telegram_recipients),
           min_severity: form.min_severity, cooldown_seconds: Number(form.cooldown_seconds) || 0,
         },
       })
@@ -86,6 +90,21 @@ export default function Notifications() {
       setTesting('')
     }
   }
+
+  const findChats = async () => {
+    setFinding(true)
+    try {
+      setChats(await api('/api/notifications/telegram/chats', { method: 'POST' }))
+    } catch (e) {
+      setChats({ ok: false, chats: [], message: e.message })
+    } finally {
+      setFinding(false)
+    }
+  }
+  const addChat = (id) => setForm((f) => {
+    const have = lines(f.telegram_recipients)
+    return have.includes(id) ? f : { ...f, telegram_recipients: [...have, id].join('\n') }
+  })
 
   const testBrowser = async () => {
     let p = permission
@@ -154,6 +173,32 @@ export default function Notifications() {
             <Send size={13} aria-hidden="true" /> {testing === 'whatsapp' ? 'Sending…' : 'Send test WhatsApp'}
           </button>
         </IntegrationCard>
+        <IntegrationCard icon={Bot} title="Telegram" configured={p.telegram.configured} provider={p.telegram.provider}
+          message={p.telegram.message || 'Open your bot in Telegram and press Start, then click Find my chat to add yourself. Save, then send a test.'}
+          testid="integration-telegram">
+          <Toggle id="telegram-enabled" checked={form.telegram_enabled} onChange={set('telegram_enabled')} label="Telegram notifications" testid="notifications-telegram-toggle" />
+          <div className="row">
+            <button type="button" className="btn btn-sm" onClick={findChats} disabled={!p.telegram.configured || finding} data-testid="notifications-telegram-find-button">
+              <Search size={13} aria-hidden="true" /> {finding ? 'Looking…' : 'Find my chat'}
+            </button>
+            <button type="button" className="btn btn-sm" onClick={() => test('telegram')} disabled={!!testing} data-testid="notifications-test-telegram-button">
+              <Send size={13} aria-hidden="true" /> {testing === 'telegram' ? 'Sending…' : 'Send test Telegram'}
+            </button>
+          </div>
+          {chats ? (
+            <div className="stack" data-testid="notifications-telegram-chats">
+              <p className="small muted">{chats.message}</p>
+              {chats.chats.map((c) => (
+                <div key={c.id} className="row" style={{ justifyContent: 'space-between' }}>
+                  <span className="small">{c.name}{c.username ? <span className="dim"> @{c.username}</span> : null} <span className="mono dim">{c.id}</span></span>
+                  <button type="button" className="btn btn-sm" onClick={() => addChat(c.id)} data-testid={`notifications-telegram-add-${c.id}`}>
+                    <Plus size={13} aria-hidden="true" /> Add
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </IntegrationCard>
       </div>
 
       <section className="panel">
@@ -171,7 +216,10 @@ export default function Notifications() {
             <textarea rows={4} className="mono" value={form.whatsapp_recipients} onChange={(e) => set('whatsapp_recipients')(e.target.value)}
               placeholder="+919876543210" data-testid="notifications-whatsapp-recipients-input" />
           </label>
-          <div aria-hidden="true" />
+          <label className="field"><span className="field-label">Telegram chat IDs (one per line)</span>
+            <textarea rows={4} className="mono" value={form.telegram_recipients} onChange={(e) => set('telegram_recipients')(e.target.value)}
+              placeholder="123456789" data-testid="notifications-telegram-recipients-input" />
+          </label>
           <label className="field"><span className="field-label">Minimum severity to send</span>
             <select value={form.min_severity} onChange={(e) => set('min_severity')(e.target.value)} data-testid="notifications-severity-filter">
               <option value="early_warning">Early warnings and above</option>

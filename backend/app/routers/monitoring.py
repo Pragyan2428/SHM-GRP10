@@ -4,12 +4,12 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from pydantic import ValidationError
 
 from ..config import Settings, get_settings
 from ..db import as_utc, audit, clean, get_db, get_setting, utcnow
-from ..models import AckRequest, IngestPayload, MqttTest
+from ..models import AckRequest, IngestPayload, MqttTest, NodeCreate, NodeUpdate
 from ..security import current_user, device_owner, require_admin
 from ..services import pipeline, sheets, tasks
 from ..services.floors import floor_from_location
@@ -42,6 +42,7 @@ def _node_view(node: dict, settings: Settings) -> dict:
         "latest": node.get("latest", {}), "last_reading_at": node.get("last_reading_at"),
         "error": error, "map_x": node.get("map_x"), "map_y": node.get("map_y"),
         "floor": node.get("floor") if node.get("floor") is not None else floor_from_location(node.get("location")),
+        "plan_x": node.get("plan_x"), "plan_y": node.get("plan_y"), "owner_id": node.get("owner_id"),
     })
 
 
@@ -76,10 +77,14 @@ async def _connection(settings: Settings, last: Optional[datetime] = None, own: 
 
 @router.get("/telemetry")
 async def telemetry(user: dict = Depends(current_user), settings: Settings = Depends(get_settings),
-                    points: int = Query(30, ge=5, le=200)):
+                    points: int = Query(30, ge=5, le=200),
+                    owner: Optional[str] = Query(None, max_length=64, description="admins: one account's nodes ('site' = the site's own)")):
     db = get_db()
     thresholds = await get_thresholds()
     ids = await visible_node_ids(user)
+    if owner and ids is None:  # an administrator looking at one account's building
+        ids = [n["node_id"] for n in await db.sensor_nodes.find(
+            {"owner_id": None if owner == "site" else owner}, {"_id": 0, "node_id": 1}).to_list(None)]
     mine = _restrict({}, ids)
     nodes = [_node_view(n, settings) for n in await db.sensor_nodes.find(mine, {"_id": 0}).to_list(None)]
     states = {(s["node_id"], s["parameter"]): s for s in await db.anomaly_scores.find(
@@ -134,6 +139,7 @@ async def telemetry(user: dict = Depends(current_user), settings: Settings = Dep
         "overall_anomaly_score": round(max((s["score"] for s in recent_states), default=0), 1),
         "parameters": params,
         "nodes": [{k: n[k] for k in ("node_id", "location", "online", "condition", "map_x", "map_y", "floor",
+                                     "plan_x", "plan_y", "owner_id",
                                      "latest", "last_seen", "battery", "rssi")} for n in nodes],
     })
 
@@ -233,8 +239,80 @@ async def acknowledge(event_id: str, body: Optional[AckRequest] = None, user: di
 # ---- nodes -----------------------------------------------------------------------
 @router.get("/nodes")
 async def list_nodes(user: dict = Depends(current_user), settings: Settings = Depends(get_settings)):
-    nodes = await get_db().sensor_nodes.find(_restrict({}, await visible_node_ids(user)), {"_id": 0}).sort("node_id", 1).to_list(None)
-    return {"items": [_node_view(n, settings) for n in nodes]}
+    db = get_db()
+    nodes = await db.sensor_nodes.find(_restrict({}, await visible_node_ids(user)), {"_id": 0}).sort("node_id", 1).to_list(None)
+    items = [_node_view(n, settings) for n in nodes]
+    if user.get("role") == "admin":
+        emails = {u["id"]: u["email"] for u in await db.users.find({}, {"_id": 0, "id": 1, "email": 1}).to_list(None)}
+        for it in items:
+            it["owner_email"] = emails.get(it["owner_id"]) if it["owner_id"] else None
+    return {"items": items}
+
+
+async def _owner_or_none(owner_id: Optional[str]) -> Optional[str]:
+    if not owner_id:
+        return None
+    if not await get_db().users.find_one({"id": owner_id}, {"_id": 1}):
+        raise HTTPException(422, "That account does not exist")
+    return owner_id
+
+
+@router.post("/nodes", status_code=201)
+async def create_node(body: NodeCreate, user: dict = Depends(require_admin), settings: Settings = Depends(get_settings)):
+    """Register a node before it reports (it shows as offline until its first reading)."""
+    db = get_db()
+    if await db.sensor_nodes.find_one({"node_id": body.node_id}, {"_id": 1}):
+        raise HTTPException(409, f"A node called {body.node_id} already exists")
+    now = utcnow()
+    doc = {"node_id": body.node_id, "label": body.node_id, "location": (body.location or "").strip() or "Unassigned location",
+           "owner_id": await _owner_or_none(body.owner_id), "plan_x": body.plan_x, "plan_y": body.plan_y,
+           "created_at": now, "calibrated_at": now, "firmware_default": "unknown", "latest": {}, "registered_by": user["email"]}
+    if body.floor is not None:
+        doc["floor"] = body.floor
+    await db.sensor_nodes.insert_one(dict(doc))
+    await audit(user, "node_created", body.node_id, {"owner_id": doc["owner_id"], "floor": body.floor})
+    return _node_view(doc, settings)
+
+
+@router.patch("/nodes/{node_id}")
+async def update_node(node_id: str, body: NodeUpdate, user: dict = Depends(require_admin),
+                      settings: Settings = Depends(get_settings)):
+    db = get_db()
+    node_id = node_id.upper()
+    if not await db.sensor_nodes.find_one({"node_id": node_id}, {"_id": 1}):
+        raise HTTPException(404, "Sensor node not found")
+    sent = body.model_fields_set
+    changes: dict = {}
+    unset: dict = {}
+    if "location" in sent and body.location is not None:
+        changes["location"] = body.location.strip() or "Unassigned location"
+    if "floor" in sent:
+        if body.floor is None:
+            unset["floor"] = ""  # back to reading it from the location text
+        else:
+            changes["floor"] = body.floor
+    for k in ("plan_x", "plan_y"):
+        if k in sent:
+            changes[k] = getattr(body, k)
+    if "owner_id" in sent:
+        changes["owner_id"] = await _owner_or_none(body.owner_id)
+    update = {**({"$set": changes} if changes else {}), **({"$unset": unset} if unset else {})}
+    if update:
+        await db.sensor_nodes.update_one({"node_id": node_id}, update)
+    await audit(user, "node_updated", node_id, {k: v for k, v in changes.items()})
+    return _node_view(await db.sensor_nodes.find_one({"node_id": node_id}, {"_id": 0}), settings)
+
+
+@router.delete("/nodes/{node_id}", status_code=204)
+async def delete_node(node_id: str, user: dict = Depends(require_admin)):
+    """Remove a node from the site. Its past readings and alerts stay in the history."""
+    db = get_db()
+    node_id = node_id.upper()
+    if (await db.sensor_nodes.delete_one({"node_id": node_id})).deleted_count == 0:
+        raise HTTPException(404, "Sensor node not found")
+    await db.anomaly_scores.delete_many({"node_id": node_id})
+    await audit(user, "node_deleted", node_id)
+    return Response(status_code=204)
 
 
 @router.get("/nodes/{node_id}")

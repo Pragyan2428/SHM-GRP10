@@ -926,3 +926,30 @@ input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
 .ud-code-copy { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 7px; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: #e6e8eb; cursor: pointer; }
 .ud-code-copy:hover { background: rgba(255,255,255,.14); }
 .ud-empty-start { display: flex; flex-direction: column; gap: 14px; }
+
+/* ---------- top-view floor plans ---------- */
+.plan-svg { width: 100%; height: auto; display: block; max-height: 520px; }
+.plan-svg.pickable { cursor: crosshair; }
+.plan-slab { fill: #15181c; stroke: #3a4048; stroke-width: 2; }
+.plan-axis { stroke: rgba(255, 255, 255, .08); stroke-dasharray: 4 6; }
+.plan-column { fill: #2b3037; stroke: #454c56; }
+.plan-bubble { fill: #0e1013; stroke: #3a4048; }
+.plan-bubble-text { fill: #8a919c; font: 600 10px var(--font-mono); text-anchor: middle; }
+.plan-note { fill: #6f7683; font: 11px Inter, sans-serif; }
+.plan-empty { fill: #8a919c; font: 13px Inter, sans-serif; text-anchor: middle; }
+.plan-pin-label { fill: #c9ced6; font: 600 10.5px var(--font-mono); text-anchor: middle; pointer-events: none; }
+.plan-svg .map-pin { cursor: pointer; }
+.plan-pick circle { fill: rgba(255, 122, 26, .18); stroke: #ff7a1a; stroke-width: 2; }
+.plan-pick line { stroke: #ff7a1a; stroke-width: 1.5; }
+.plans { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.plans-tabs { align-self: flex-start; flex-wrap: wrap; }
+.plans-empty { padding: 48px 12px; text-align: center; color: var(--text-2); border: 1px dashed var(--line-2); border-radius: 12px; }
+.plans-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.plan-card { margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, .02); min-width: 0; }
+.plan-card figcaption { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; color: var(--text-2); }
+.plan-card figcaption button { background: none; border: 0; padding: 0; color: var(--text); font: 700 13px Inter, sans-serif; cursor: pointer; }
+.plan-card figcaption button:hover { color: var(--accent); }
+.plan-stage { padding: 4px 0; }
+.dialog:has(.node-form) { width: min(640px, calc(100vw - 32px)); }
+.node-form .plan-svg { max-height: 300px; border: 1px solid var(--line); border-radius: 10px; }
+.node-card-actions { flex-wrap: wrap; gap: 6px; }

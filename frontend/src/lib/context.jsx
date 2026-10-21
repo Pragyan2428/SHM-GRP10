@@ -178,6 +178,7 @@ export function useFetch(path, query, deps = []) {
   const [state, setState] = useState({ data: null, error: null, loading: true })
   const key = JSON.stringify(query || {})
   const load = useCallback(async () => {
+    if (!path) { setState({ data: null, error: null, loading: false }); return } // nothing to load (yet)
     setState((s) => ({ ...s, loading: true }))
     try {
       const data = await api(path, { query })

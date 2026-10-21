@@ -178,7 +178,7 @@ def _base_alert(doc: dict, th: dict, st: dict, now: datetime, kind: str, severit
         "status": "open", "acknowledged_by": None, "acknowledged_at": None, "ack_note": None,
         "notification_status": "pending",
         "notifications": {"email": {"status": "pending"}, "sms": {"status": "pending"},
-                          "whatsapp": {"status": "pending"}},
+                          "whatsapp": {"status": "pending"}, "telegram": {"status": "pending"}},
         "sheets_synced": False, "sheets_synced_at": None, "dedupe_key": key,
     }
 

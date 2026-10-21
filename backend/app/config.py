@@ -71,6 +71,7 @@ class Settings(BaseSettings):
     twilio_from_number: Optional[str] = Field(default=None, alias="TWILIO_FROM_NUMBER")
     # WhatsApp via the same Twilio account (sandbox number +14155238886 or an approved sender)
     twilio_whatsapp_from: Optional[str] = Field(default=None, alias="TWILIO_WHATSAPP_FROM")
+    telegram_bot_token: Optional[str] = Field(default=None, alias="TELEGRAM_BOT_TOKEN")  # from @BotFather
 
     # Google Sheets
     google_service_account_json: Optional[str] = Field(default=None, alias="GOOGLE_SERVICE_ACCOUNT_JSON")
@@ -131,6 +132,10 @@ class Settings(BaseSettings):
     @property
     def whatsapp_configured(self) -> bool:
         return bool(self.twilio_account_sid and self.twilio_auth_token and self.twilio_whatsapp_from)
+
+    @property
+    def telegram_configured(self) -> bool:
+        return bool(self.telegram_bot_token)
 
     @property
     def sms_configured(self) -> bool:

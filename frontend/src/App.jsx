@@ -5,6 +5,7 @@ import { EmptyState, Loading } from './components/ui'
 import { AuthProvider, LiveProvider, ToastProvider, useAuth } from './lib/context'
 import About from './pages/About'
 import GoogleSheets from './pages/GoogleSheets'
+import UserStructure from './pages/UserStructure'
 import History from './pages/History'
 import LiveTelemetry from './pages/LiveTelemetry'
 import AuthPage from './pages/Auth'
@@ -73,6 +74,7 @@ export default function App() {
             <Route path="notifications" element={<Notifications />} />
             <Route path="google-sheets" element={<GoogleSheets />} />
             <Route path="users" element={<Users />} />
+            <Route path="users/:userId" element={<UserStructure />} />
             <Route path="system" element={<System />} />
             <Route path="*" element={<NotFound />} />
           </Route>

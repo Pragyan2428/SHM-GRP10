@@ -58,12 +58,20 @@ All secrets come from environment variables. None are hard-coded, and none are s
 | Email | `EMAIL_PROVIDER` (`smtp`/`resend`/`sendgrid`), `EMAIL_FROM`; SMTP: `SMTP_HOST` (default `smtp.gmail.com`), `SMTP_PORT` (587, or 465 for SSL), `SMTP_USERNAME`, `SMTP_PASSWORD`; Resend/SendGrid: `EMAIL_API_KEY` |
 | SMS | `SMS_PROVIDER=twilio`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` |
 | WhatsApp | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM` (sandbox `+14155238886`) |
+| Telegram | `TELEGRAM_BOT_TOKEN` (from @BotFather); chat IDs are set on the Notifications page |
 | Google Sheets | Apps Script (no key): `GOOGLE_SHEETS_WEBHOOK_URL`, `GOOGLE_SHEETS_WEBHOOK_SECRET`. Or a service account: `GOOGLE_SERVICE_ACCOUNT_JSON` or `GOOGLE_SERVICE_ACCOUNT_FILE`, `GOOGLE_SHEETS_SPREADSHEET_ID`. Both use `GOOGLE_SHEETS_WORKSHEET` |
 | MQTT | `MQTT_BROKER_URL`, `MQTT_PORT`, `MQTT_USERNAME`, `MQTT_PASSWORD`, `MQTT_TOPIC`, `MQTT_TLS` |
 
 If an integration is missing its credentials, it shows as **Not configured** in the UI and everything else keeps working. If the core configuration is missing (`MONGO_URL`, `JWT_SECRET`), the API refuses to start and prints a clear error.
 
 ## Connecting ESP32 nodes
+
+**Floor plans and node management (admin).**
+- **Admin dashboard:** shows a **top-view floor plan** for each floor (all side by side, or one large). Each node is a dot at its spot, coloured by status. Click a dot to see its readings.
+- **Adding a node:** on **Sensor nodes**, **Add node** registers a node before it reports. You set its ID (the sketch's `NODE_ID`), location, floor, the account it belongs to, and its spot, by clicking on that floor's plan.
+- **Editing and deleting:** **Edit** changes these later. **Delete** removes a node; its readings and alerts stay in the history.
+- **Users page:** shows how many nodes each account has. **Building** (or a click on the name) opens that account's building, drawn only from its own nodes: the 3D structure, its floor plans and its node list. This is what that account sees.
+- **API:** `POST /api/nodes`, `PATCH /api/nodes/{id}` and `DELETE /api/nodes/{id}` (admins). `floor: null` means "read the floor from the location", and `plan_x` / `plan_y` are percentages from the left / top of the plan. `GET /api/telemetry?owner=<user id>` returns one account's nodes; `owner=site` returns the site's own.
 
 **Whose nodes are whose.** Every account has a **personal device key**, shown with **Show / Copy / New key** on the **Connect your ESP32** card of its readings page. The card also gives the website's ingest URL, ready-to-paste `secrets.h` lines, a suggested unique `NODE_ID` and a dummy-node command.
 - **A node sent with an account's key belongs to that account.** That account sees only its own nodes, readings, alerts and building drawing; a new account starts empty and only sees the card. Administrators see every node.
@@ -108,7 +116,7 @@ python tools/dummy_esp32.py --url http://<this-pc-ip>:8000/api/ingest --breach-e
 
 `--node` sets the node ID (default `ESP32-DUMMY`), `--interval` sets the seconds between readings, and `--breach-every N` sends a strain value over the limit every Nth reading so you can watch an alert go through. Devices on the network can only reach the API when it listens on `0.0.0.0` (as `.claude/launch.json` does), and Windows Firewall must allow Python. Stop the dummy before the real board reports under the same node ID.
 
-## Email and WhatsApp alerts
+## Email, WhatsApp and Telegram alerts
 
 Alerts at or above the **minimum severity** (Notifications page) go to every configured channel. Each channel can be switched off there, and a cooldown stops repeats for the same node and sensor.
 
@@ -124,6 +132,14 @@ Alerts at or above the **minimum severity** (Notifications page) go to every con
 4. On **Notifications**, add their numbers with country code (e.g. `+919876543210`), save, then **Send test WhatsApp**.
 
 WhatsApp only lets a business send free-form messages within 24 hours of the recipient's last message to that number. With the sandbox, recipients may need to message it again if alerts stop arriving. For always-on alerts, register your own WhatsApp sender in Twilio and use an approved message template. Every attempt and any error appear in the **Delivery log**.
+
+**Telegram (to the admin)**
+1. In Telegram, open **@BotFather**, send `/newbot`, and pick a name. Copy the **bot token** it gives you.
+2. Set `TELEGRAM_BOT_TOKEN=<token>`: in `backend/.env` locally, or in Vercel (**Settings → Environments → Production**), then restart or **Redeploy**.
+3. Open your new bot in Telegram and press **Start** (a bot may only message people who have started it).
+4. On **Notifications**, click **Find my chat**, then **Add** next to your name, then **Save settings**, then **Send test Telegram**.
+
+Alerts at or above the minimum severity are sent to every chat ID listed, with the same text as the email. Group chats work too: add the bot to the group and send a message in it, then use **Find my chat**.
 
 ## Google Sheets
 
@@ -198,6 +214,8 @@ Failures keep a trace and screenshot; `npx playwright show-report` opens the HTM
 | Google Sheets via Apps Script: secret check, retry without duplicates, rows updated on acknowledge/escalate/resolve, no lost change during a sync, old-script detection, `script.google.com`-only URLs, the real `.gs` file run under Node | `tests/test_sheets_apps_script.py` (needs `node` for the last test); setup guide and copy button in `e2e/sheets.spec.js` |
 | Vercel (serverless) mode: alert work and sheet row done before the reply, no loops or demo nodes, in-memory database refused, startup errors explained at `/api/health` and on the login page with passwords hidden, failed starts retried, safe parallel seeding | `tests/test_serverless.py`, `tests/test_parallel_start.py`; login message in `e2e/auth.spec.js` |
 | Profile card: avatar presets and photo upload, name and password changes | `tests/test_profile.py`; `e2e/profile.spec.js` |
+| Telegram bot: find chats, test message, alerts, helpful errors (fake Telegram API) | `tests/test_telegram.py`; card in `e2e/admin.spec.js` |
+| Admin node management and per-user buildings: add/edit/move/delete nodes, owners, one account's view, floor plans | `tests/test_admin_nodes.py`; `e2e/admin.spec.js`, `e2e/project.spec.js` |
 | WhatsApp via Twilio, Gmail SMTP (STARTTLS/SSL, App Password errors), per-channel on/off | `tests/test_notification_channels.py` (Twilio and SMTP are faked, no real messages) |
 | Browser notification request and delivery | `e2e/alerts.spec.js` (permission granted with `context.grantPermissions`) |
 | 390px mobile layout, no horizontal overflow | `e2e/mobile.spec.js`: `scrollWidth <= 390` on every dashboard route as admin, and on the `/user` readings page |

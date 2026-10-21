@@ -49,3 +49,6 @@ export function anomalyLevel(score) {
 export function slug(s) {
   return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 }
+
+/** Short floor name: 0 -> GF, 3 -> 3F, -1 -> B1, "roof" -> Roof. */
+export const floorName = (f) => (f === 'roof' ? 'Roof' : f === 0 ? 'GF' : f < 0 ? `B${-f}` : `${f}F`)

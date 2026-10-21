@@ -1,31 +1,6 @@
 import { expect, test } from '@playwright/test'
-import { ADMIN, API_PORT, DEVICE_KEY, VIEWER } from './env.js'
-import { ingest, login, uniqueNode } from './helpers.js'
-
-test('the building is drawn from the floors the connected nodes report', async ({ page, request }) => {
-  const send = async (data) => {
-    const r = await request.post(`http://127.0.0.1:${API_PORT}/api/ingest`, { headers: { 'X-Device-Key': DEVICE_KEY }, data })
-    expect(r.status(), await r.text()).toBe(200)
-  }
-  const high = uniqueNode()
-  const top = uniqueNode()
-  const loose = uniqueNode()
-  await send({ node_id: high, location: '7th floor - column C2', readings: { strain: 120 } })
-  await send({ node_id: top, location: 'Plant room', floor: 'roof', readings: { strain: 90 } })
-  await ingest(request, loose, { strain: 80 }) // "E2E test span": no floor in the text
-
-  await login(page, ADMIN)
-  const map = page.getByTestId('structural-map')
-  await expect(map.getByTestId(`map-pin-${high.toLowerCase()}`)).toHaveAttribute('data-floor', '7')
-  await expect(map.getByTestId(`map-pin-${top.toLowerCase()}`)).toHaveAttribute('data-floor', 'roof')
-  await expect(map.getByTestId(`map-pin-${loose.toLowerCase()}`)).toHaveAttribute('data-floor', 'unknown')
-  await expect(map.getByTestId('twin-unplaced-label')).toBeVisible()
-  await expect(page.getByTestId('twin-floors')).toContainText('7F')
-  await page.getByTestId('twin-floor-7f').click() // a filter exists only for floors that have sensors
-  await expect(map.getByTestId(`map-pin-${high.toLowerCase()}`)).toHaveAttribute('opacity', '1')
-  await expect(map.getByTestId('map-pin-esp32-02')).toHaveAttribute('opacity', '0.25')
-  await expect(page.getByTestId('twin-floor-6f')).toHaveCount(0)
-})
+import { ADMIN, VIEWER } from './env.js'
+import { login } from './helpers.js'
 
 test('the About page is public and shows the project from the presentation', async ({ page }) => {
   await page.goto('/login')
@@ -63,11 +38,15 @@ test('the dashboard shows only strain, vibration and temperature, with their sen
   await expect(page.getByTestId('telemetry-displacement-card')).toHaveCount(0)
 })
 
-test('the structural map is a building', async ({ page }) => {
+test('the admin dashboard shows top-view floor plans', async ({ page }) => {
   await login(page, ADMIN)
-  await expect(page.getByTestId('header-structure-name')).toContainText('building')
   const map = page.getByTestId('structural-map')
-  await expect(map.locator('svg')).toHaveAttribute('aria-label', /Building digital twin/)
+  await expect(map.getByTestId('floor-plans')).toBeVisible()
+  await expect(map.locator('svg[aria-label^="Building digital twin"]')).toHaveCount(0) // no 3D building here
+  await expect(map.getByTestId('plan-card-gf')).toBeVisible() // "All floors": a plan per floor
+  await expect(map.getByTestId('plan-card-roof')).toBeVisible()
+  await map.getByTestId('plan-tab-roof').click()
+  await expect(map.getByTestId('plan-roof')).toHaveAttribute('aria-label', 'Floor plan of Roof')
   await map.getByTestId('map-pin-esp32-06').click()
   await expect(page.getByTestId('map-pin-location')).toContainText('Roof')
 })

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Building2, CheckCircle2, Copy, Gauge, Info, LayoutDashboard, Map as MapIcon, Plus, Search, Table2 } from 'lucide-react'
+import { Activity, AlertTriangle, BellRing, ArrowDownRight, ArrowUpRight, Building2, CheckCircle2, Copy, Gauge, Info, LayoutDashboard, Map as MapIcon, Plus, Search, Table2 } from 'lucide-react'
 import { BrandMark } from '../components/Layout'
 import { PARAM_ICON } from '../components/monitoring'
 import ProfileMenu, { Avatar } from '../components/ProfileMenu'
@@ -224,7 +224,7 @@ export default function UserReadings() {
               </button>
             ) : null}
             <p data-testid="user-last-update">
-              {data
+              {data?.total_nodes === 0 ? <>No ESP32 connected yet. Add one below to see live readings.</> : data
                 ? <>Updated <span className="mono">{fmtTime(data.last_reading_at)}</span> ({fmtAgo(data.last_reading_at)}) · {data.active_nodes} of {data.total_nodes} nodes online · refreshes every 5 s</>
                 : 'Loading…'}
             </p>
@@ -360,16 +360,18 @@ export default function UserReadings() {
           </>
         )}
       </main>
-      {data && data.total_nodes > 0 ? (
-        <nav className="ud-tabbar" aria-label="Sections">
+      {data ? (
+        <nav className={`ud-tabbar ${data.total_nodes > 0 ? '' : 'short'}`} aria-label="Sections">
           <a href="#ud-top"><LayoutDashboard size={19} aria-hidden="true" /><span>Home</span></a>
-          <a href="#ud-trend"><Activity size={19} aria-hidden="true" /><span>Trends</span></a>
+          {data.total_nodes > 0 ? <a href="#ud-trend"><Activity size={19} aria-hidden="true" /><span>Trends</span></a> : null}
           <button type="button" className="ud-tab-add" aria-label="Add an ESP32" data-testid="ud-tab-add" onClick={() => {
             const el = document.getElementById('ud-add')
             if (el) { if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
           }}><Plus size={24} aria-hidden="true" /></button>
-          <a href="#ud-nodes"><Table2 size={19} aria-hidden="true" /><span>Nodes</span></a>
-          <a href="#ud-map"><MapIcon size={19} aria-hidden="true" /><span>Map</span></a>
+          {data.total_nodes > 0 ? <>
+            <a href="#ud-nodes"><Table2 size={19} aria-hidden="true" /><span>Nodes</span></a>
+            <a href="#ud-map"><MapIcon size={19} aria-hidden="true" /><span>Map</span></a>
+          </> : <a href="#ud-alerts"><BellRing size={19} aria-hidden="true" /><span>Alerts</span></a>}
         </nav>
       ) : null}
       <Toasts />

@@ -91,7 +91,7 @@ function BluetoothSetup({ onDone }) {
     <div className="stack ble-setup" data-testid="ble-setup">
       {!chars ? (
         <>
-          <p className="small dim">Power on the new ESP32 near this computer. A board without Wi-Fi shows up as <span className="mono">SHM-xxxxxx</span>.</p>
+          <p className="small dim">Power on the new ESP32 near this phone or computer. A board without Wi-Fi shows up as <span className="mono">SHM-xxxxxx</span>.</p>
           <button type="button" className="btn" onClick={connect} disabled={busy} data-testid="ble-connect-button" style={{ alignSelf: 'flex-start' }}>
             {busy ? <Loader2 size={14} className="spin" aria-hidden="true" /> : <Bluetooth size={14} aria-hidden="true" />} Find ESP32 over Bluetooth
           </button>

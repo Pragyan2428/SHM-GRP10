@@ -69,7 +69,7 @@ export default function MyAlerts() {
   if (!st) return null
   const { email, telegram } = st
   return (
-    <section className="ud-card ud-alerts" aria-labelledby="ud-alerts-title" data-testid="my-alerts">
+    <section className="ud-card ud-alerts" id="ud-alerts" aria-labelledby="ud-alerts-title" data-testid="my-alerts">
       <div className="ud-card-head"><h2 id="ud-alerts-title"><BellRing size={17} aria-hidden="true" /> My alerts</h2></div>
       <p className="ud-sub">When one of your nodes goes over its limit, you are told here and on:</p>
 

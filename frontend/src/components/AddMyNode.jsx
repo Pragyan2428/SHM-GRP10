@@ -1,7 +1,7 @@
 // "Add your ESP32" on a user's page: find a board over Bluetooth (to give it the Wi-Fi) or on
 // the same Wi-Fi, give it a place, and it becomes one of this user's nodes. No keys or commands.
 import { useState } from 'react'
-import { CheckCircle2, Cpu } from 'lucide-react'
+import { Bluetooth, CheckCircle2, Cpu, Link2, Power } from 'lucide-react'
 import NearbyDevices from './NearbyDevices'
 import { api } from '../lib/api'
 import { useToast } from '../lib/context'
@@ -51,10 +51,11 @@ export default function AddMyNode({ open, onConnected }) {
   const [done, setDone] = useState(false)
   const body = (
     <div className="ud-connect-body">
-      <p className="ud-sub">
-        Switch on your ESP32 nearby. <strong>New board?</strong> Use <strong>Set up over Bluetooth</strong> to give it your Wi-Fi.
-        Once it is on Wi-Fi it appears below; press <strong>Connect</strong> and say where it is. Its readings then show on your dashboard.
-      </p>
+      <ol className="ud-steps" aria-label="How to connect">
+        <li><span className="ud-step-icon"><Power size={16} aria-hidden="true" /></span><span><strong>Switch it on</strong>Keep the ESP32 near this phone or computer.</span></li>
+        <li><span className="ud-step-icon"><Bluetooth size={16} aria-hidden="true" /></span><span><strong>Give it your Wi-Fi</strong>New board? Tap <em>Set up over Bluetooth</em>.</span></li>
+        <li><span className="ud-step-icon"><Link2 size={16} aria-hidden="true" /></span><span><strong>Press Connect</strong>Say where it is. Readings appear here.</span></li>
+      </ol>
       {done ? <p className="ud-sub c-nominal" data-testid="my-node-done"><CheckCircle2 size={14} aria-hidden="true" /> Connected. Add another below if you like.</p> : null}
       {picked ? (
         <ConnectForm device={picked} onCancel={() => setPicked(null)} onConnected={() => { setPicked(null); setDone(true); onConnected?.() }} />

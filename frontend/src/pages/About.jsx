@@ -73,6 +73,34 @@ const TIMELINE = [
   { month: 'Month 4', text: 'Performance testing, final validation and MVP release (Week 16)' },
 ]
 
+// Photo rows inside the sections: [file, caption title, caption text, alt]
+const HARDWARE_PHOTOS = [
+  ['hw-esp32', 'ESP32 dev board', 'The brain of every node: reads the sensors and sends over Wi-Fi.', 'An ESP32 development board on a dark desk'],
+  ['hw-adxl', '3-axis accelerometer module', 'Feels the vibration of a beam or column, the job the ADXL345 does in our node.', 'A small blue accelerometer breakout board next to header pins'],
+]
+const WHY_PHOTOS = [
+  ['why-arch', 'Old structures age quietly', 'Brick and stone keep weathering long after anyone last checked them.', 'An old brick arch bridge over a dry stream'],
+  ['why-netting', 'Inspection is slow and manual', 'Engineers still walk every span; our nodes watch it all the time.', 'A man walking on safety netting under a steel bridge deck'],
+]
+const SERVE_PHOTOS = [
+  ['serve-flyover', 'Flyovers & interchanges', 'Heavy daily traffic, constant vibration.', 'Aerial view of a multi-level highway interchange'],
+  ['serve-housing', 'Ageing apartment blocks', 'Older homes where cracks matter most.', 'An old multi-storey residential building with balconies'],
+  ['serve-steel-bridge', 'Steel & rail bridges', 'Riveted trusses under load, rain and heat.', 'A steel truss bridge walkway in fog and rain'],
+]
+
+function PhotoRow({ items, testid }) {
+  return (
+    <div className={`about-photos n${items.length}`} data-testid={testid}>
+      {items.map(([file, title, text, alt]) => (
+        <figure key={file} className="about-photo">
+          <img src={`/images/${file}.webp`} alt={alt} loading="lazy" decoding="async" />
+          <figcaption><strong>{title}</strong><span>{text}</span></figcaption>
+        </figure>
+      ))}
+    </div>
+  )
+}
+
 const MARKET = ['Building owners and facility managers', 'Civil engineers and structural consultants', 'Construction companies',
   'Government infrastructure departments', 'Smart city and urban development projects']
 
@@ -230,6 +258,7 @@ export default function About() {
               </li>
             ))}
           </ol>
+          <PhotoRow items={HARDWARE_PHOTOS} testid="about-hardware-photos" />
           <div className="grid grid-2">
             <div className="panel">
               <div className="panel-head"><h3>Core components</h3></div>
@@ -257,7 +286,8 @@ export default function About() {
           <Cards items={INNOVATIONS} testid="about-innovation-cards" />
         </Section>
 
-        <Section id="comparison" eyebrow="Comparison" title="Traditional vs. proposed system">
+        <Section id="comparison" eyebrow="Why it matters" title="Traditional vs. proposed system">
+          <PhotoRow items={WHY_PHOTOS} testid="about-why-photos" />
           <div className="panel">
             <table className="data responsive" data-testid="about-comparison-table">
               <thead><tr><th>Criterion</th><th>Manual inspection</th><th>Industrial SHM</th><th>Our solution</th></tr></thead>
@@ -292,6 +322,7 @@ export default function About() {
         </Section>
 
         <Section id="market" eyebrow="Target market & expected outcomes" title="Who it serves">
+          <PhotoRow items={SERVE_PHOTOS} testid="about-serve-photos" />
           <div className="grid grid-2">
             <div className="panel">
               <div className="panel-head"><h3>Who it serves</h3></div>

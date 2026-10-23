@@ -1169,3 +1169,28 @@ input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
   .about-banner img, .about-split-img, .ud-photo, .us-photo { transition: none; transform: none !important; }
 }
+
+/* About: rows of captioned photos inside sections */
+.about-photos { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.about-photos.n3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.about-photo { position: relative; margin: 0; height: 280px; border-radius: 20px; overflow: hidden; border: 1px solid var(--line); background: #0b0c0e; }
+.about-photos.n3 .about-photo { height: 340px; }
+.about-photo img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .7s cubic-bezier(.22, 1, .36, 1); }
+.about-photo:hover img { transform: scale(1.06); }
+.about-photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(5,5,6,.92) 0%, rgba(5,5,6,.55) 32%, transparent 62%); pointer-events: none; }
+.about-photo figcaption { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 18px; display: flex; flex-direction: column; gap: 4px; }
+.about-photo figcaption strong { font-family: var(--font-head); font-size: 17px; color: #fff; letter-spacing: -.01em; }
+.about-photo figcaption span { font-size: 13px; color: #c9ced6; line-height: 1.45; }
+@media (max-width: 860px) { .about-photos.n3 { grid-template-columns: minmax(0, 1fr); } .about-photos.n3 .about-photo { height: 240px; } }
+@media (max-width: 640px) { .about-photos { grid-template-columns: minmax(0, 1fr); } .about-photo { height: 230px; } }
+@media (prefers-reduced-motion: reduce) { .about-photo img { transition: none; transform: none !important; } }
+
+/* Login / sign-up: a photo behind the orange panel, crane for Login, tower for Sign up */
+.auth-overlay::before, .auth-overlay::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; transition: opacity .7s ease, transform .9s cubic-bezier(.22, 1, .36, 1); }
+.auth-overlay::before { background: linear-gradient(160deg, rgba(255,138,42,.55), rgba(184,58,7,.78)), url('/images/login-crane.webp') center 35% / cover no-repeat; opacity: 1; }
+.auth-overlay::after { background: linear-gradient(160deg, rgba(255,138,42,.5), rgba(184,58,7,.75)), url('/images/login-tower.webp') center / cover no-repeat; opacity: 0; transform: scale(1.1); }
+.auth-card.signup .auth-overlay::before { opacity: 0; transform: scale(1.1); }
+.auth-card.signup .auth-overlay::after { opacity: 1; transform: none; }
+.auth-card.login .auth-overlay:hover::before, .auth-card.signup .auth-overlay:hover::after { transform: scale(1.06); }
+.auth-overlay-inner { position: relative; z-index: 1; }
+@media (prefers-reduced-motion: reduce) { .auth-overlay::before, .auth-overlay::after { transition: opacity .2s; transform: none !important; } }

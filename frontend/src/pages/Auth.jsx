@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
+import ShmBackdrop from '../components/ShmBackdrop'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/context'
 import LoginForm, { AuthPanelContent, homeFor } from './Login'
@@ -39,6 +40,7 @@ export default function AuthPage() {
   const off = (m) => (mode === m ? {} : { inert: 'true', 'aria-hidden': 'true' })
   return (
     <div className="auth-page">
+      <ShmBackdrop />
       <main className={`auth-card slider ${mode}`} data-mode={mode}>
         <div className="auth-panes" ref={panesRef}>
           <section className={`auth-pane pane-login ${mode === 'login' ? 'active' : ''}`} ref={loginRef} data-testid="login-page" {...off('login')}>

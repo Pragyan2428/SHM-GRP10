@@ -8,6 +8,7 @@ import {
 import ExplodedNode from '../components/ExplodedNode'
 import { BrandMark } from '../components/Layout'
 import ScrollTop from '../components/ScrollTop'
+import ShmBackdrop from '../components/ShmBackdrop'
 import NodeViewer from '../components/NodeViewer'
 import { useAuth } from '../lib/context'
 
@@ -157,6 +158,7 @@ export default function About() {
 
   return (
     <div className="about-page" data-testid="about-page">
+      <ShmBackdrop />
       <div className="about-hero-wrap">
         <header className="about-nav">
           <Link to="/about" className="about-brand"><BrandMark /><span className="brand-name">Smart <span>SHM</span></span></Link>

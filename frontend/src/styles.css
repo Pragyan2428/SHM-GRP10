@@ -452,7 +452,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
 
 /* ---------- about the project (/about): black landing hero + content ---------- */
 .about-page { min-height: 100vh; display: flex; flex-direction: column; background: #050506; }
-.about-hero-wrap { background: radial-gradient(900px 520px at 78% 40%, rgba(255,122,26,.12), transparent 60%), #000; border-bottom: 1px solid var(--line); }
+.about-hero-wrap { background: radial-gradient(900px 520px at 78% 40%, rgba(255,122,26,.12), transparent 60%); border-bottom: 1px solid var(--line); } /* see-through, so the animated backdrop shows */
 .about-nav { max-width: 1240px; margin: 0 auto; padding: 20px 24px; display: flex; align-items: center; gap: 18px; }
 .about-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--text); }
 .about-brand:hover { text-decoration: none; }
@@ -1226,3 +1226,8 @@ input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
 .nf-photo span { position: absolute; left: 18px; bottom: 16px; z-index: 1; color: #fff; font-weight: 700; font-size: 15px; }
 @media (prefers-reduced-motion: reduce) { .about-cta-photo::before, .ud-connect-photo img, .nf-photo img { transition: none; transform: none !important; } }
 .panel > .nf-photo { margin: 14px 14px 0; }
+
+/* animated monitoring backdrop (skyline, pulsing sensor nodes, vibration trace) */
+.auth-page, .about-page { position: relative; isolation: isolate; }
+.shm-backdrop { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: .9; }
+@media (max-width: 760px) { .auth-page .shm-backdrop { display: none; } /* the phone form covers the screen */ }

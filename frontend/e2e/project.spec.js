@@ -83,3 +83,12 @@ test('the 3D section fits a 390px phone while scrolling', async ({ page }) => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   }
 })
+
+test('the About and login pages have the animated monitoring backdrop behind them', async ({ page }) => {
+  for (const path of ['/about', '/login']) {
+    await page.goto(path)
+    const bg = page.getByTestId('shm-backdrop')
+    await expect(bg).toBeAttached()
+    await expect(bg).toHaveCSS('pointer-events', 'none') // never blocks clicks
+  }
+})

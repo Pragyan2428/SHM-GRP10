@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ArrowLeft, Battery, BatteryLow, Cpu, MapPin, Pencil, Plus, Trash2, Wifi, WifiOff } from 'lucide-react'
 import { FloorPlan } from '../components/FloorPlan'
+import NearbyDevices from '../components/NearbyDevices'
 import { AlertStream, PARAM_ICON, TrendIcon } from '../components/monitoring'
 import { Badge, Dialog, EmptyState, ErrorState, Loading } from '../components/ui'
 import { api } from '../lib/api'
@@ -45,9 +46,11 @@ const FLOOR_OPTIONS = [
   ['0', 'GF · ground floor'], ...Array.from({ length: 40 }, (_, i) => [String(i + 1), `${i + 1}F · floor ${i + 1}`]), ['roof', 'Roof'],
 ]
 
-// Register a node before it reports, or change where an existing node is and whose it is.
+// Register a node before it reports, connect an ESP32 found on the Wi-Fi,
+// or change where an existing node is and whose it is.
 function NodeForm({ initial, nodes, onClose, onSaved }) {
   const editing = !!initial
+  const [pair, setPair] = useState(null) // a nearby ESP32 picked from the list
   const users = useFetch('/api/users')
   const [form, setForm] = useState({
     node_id: initial?.node_id || '', location: initial?.location || '',
@@ -57,6 +60,14 @@ function NodeForm({ initial, nodes, onClose, onSaved }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const pick = (d) => {
+    setPair(d)
+    setError('')
+    const taken = new Set(nodes.map((n) => n.node_id))
+    if (d && (!form.node_id || /^ESP32-[0-9A-F]{6}$/i.test(form.node_id) || taken.has(form.node_id.toUpperCase()))) {
+      setForm((f) => ({ ...f, node_id: d.suggested_node_id }))
+    }
+  }
   const floorValue = form.floor === '' ? null : form.floor === 'roof' ? 'roof' : Number(form.floor)
   const others = nodes.filter((n) => n.node_id !== initial?.node_id && floorValue != null && String(n.floor) === String(floorValue))
   const submit = async (e) => {
@@ -66,9 +77,12 @@ function NodeForm({ initial, nodes, onClose, onSaved }) {
     setBusy(true)
     const body = { location: form.location, floor: floorValue, owner_id: form.owner_id || null, plan_x: form.plan_x, plan_y: form.plan_y }
     try {
+      const id = form.node_id.trim()
       if (editing) await api(`/api/nodes/${encodeURIComponent(initial.node_id)}`, { method: 'PATCH', body })
-      else await api('/api/nodes', { method: 'POST', body: { ...body, node_id: form.node_id.trim() } })
-      onSaved(editing ? `${initial.node_id} updated` : `${form.node_id.trim().toUpperCase()} added`)
+      else if (pair) await api(`/api/devices/${encodeURIComponent(pair.mac)}/approve`, { method: 'POST', body: { ...body, node_id: id } })
+      else await api('/api/nodes', { method: 'POST', body: { ...body, node_id: id } })
+      onSaved(editing ? `${initial.node_id} updated`
+        : pair ? `${id.toUpperCase()} connected. Its first reading arrives in a few seconds.` : `${id.toUpperCase()} added`)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -78,8 +92,15 @@ function NodeForm({ initial, nodes, onClose, onSaved }) {
   return (
     <Dialog title={editing ? `Edit ${initial.node_id}` : 'Add sensor node'} onClose={onClose} testid="node-form-dialog">
       <form onSubmit={submit} className="stack node-form" noValidate>
+        {!editing ? <NearbyDevices selectedMac={pair?.mac} onPick={pick} /> : null}
         {!editing ? (
-          <label className="field"><span className="field-label">Node ID (the NODE_ID in the ESP32 sketch)</span>
+          <p className="small dim" style={{ margin: 0 }} data-testid="node-form-mode">
+            {pair ? <>Connecting <span className="mono">{pair.mac}</span>: name it and place it, then press Connect.</>
+              : 'Or register a node by hand (an ESP32 set up with a device key in secrets.h):'}
+          </p>
+        ) : null}
+        {!editing ? (
+          <label className="field"><span className="field-label">{pair ? 'Node ID (shown on the dashboard)' : 'Node ID (the NODE_ID in the ESP32 sketch)'}</span>
             <input value={form.node_id} onChange={set('node_id')} className="mono" placeholder="ESP32-08" data-testid="node-form-id-input" />
           </label>
         ) : null}
@@ -114,7 +135,7 @@ function NodeForm({ initial, nodes, onClose, onSaved }) {
         {error ? <p className="field-error" role="alert" data-testid="node-form-error">{error}</p> : null}
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <button type="button" className="btn" onClick={onClose} data-testid="node-form-cancel-button">Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={busy} data-testid="node-form-submit-button">{busy ? 'Saving…' : editing ? 'Save' : 'Add node'}</button>
+          <button type="submit" className="btn btn-primary" disabled={busy} data-testid="node-form-submit-button">{busy ? 'Saving…' : editing ? 'Save' : pair ? 'Connect' : 'Add node'}</button>
         </div>
       </form>
     </Dialog>
@@ -193,7 +214,7 @@ export function NodesPage() {
       <div className="page-head">
         <div>
           <h1 data-testid="page-title">Sensor nodes</h1>
-          <p>ESP32 field devices · offline after {30}s without data · add a node here before it reports, or edit where it is</p>
+          <p>ESP32 field devices · offline after {30}s without data · Add node finds ESP32s on your Wi-Fi or over Bluetooth</p>
         </div>
         <div className="page-actions">
           {data ? (

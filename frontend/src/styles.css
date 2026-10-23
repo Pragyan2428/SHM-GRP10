@@ -975,3 +975,11 @@ input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
 .ud-ws-form { display: flex; gap: 4px; margin-top: 2px; }
 .ud-ws-form input { min-width: 0; flex: 1; font-size: 12.5px; padding: 3px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.08); color: inherit; }
 .ud-ws-form button { font-size: 12px; padding: 3px 8px; border-radius: 6px; border: 0; background: #ff7a1a; color: #fff; cursor: pointer; }
+
+/* Add node > nearby ESP32s (Wi-Fi discovery + Bluetooth set-up) */
+.nearby { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+.nearby-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow: auto; }
+.nearby-list li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.nearby-list li.selected { border-color: var(--accent); }
+.nearby-meta { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ble-setup { padding: 10px; border: 1px dashed var(--line-2); border-radius: 10px; }

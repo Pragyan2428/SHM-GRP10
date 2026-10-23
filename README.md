@@ -66,6 +66,18 @@ If an integration is missing its credentials, it shows as **Not configured** in 
 
 ## Connecting ESP32 nodes
 
+### Wireless set-up: Bluetooth, then Wi-Fi discovery (recommended)
+
+No per-board editing of `secrets.h`. Flash `tools/esp32_shm_node` once (Tools > Partition Scheme > **Huge APP**), then:
+
+1. **Bluetooth (first time).** A board with no Wi-Fi saved advertises as `SHM-xxxxxx`. On **Sensor nodes > Add node**, press **Set up over Bluetooth**, then **Find ESP32 over Bluetooth**. Pick the board, choose the Wi-Fi from the list it scanned, type the password and press **Send Wi-Fi to ESP32**. The website's own address is sent as the server, too. This needs Chrome or Edge on https or localhost (Web Bluetooth).
+2. **Wi-Fi discovery.** Once on Wi-Fi, the board calls `POST /api/devices/announce` every 5 s with its MAC address and a random claim secret kept in flash. **Add node** lists the boards on the **same Wi-Fi as your browser** (same public IP when the API is on Vercel; any private address when the API runs on a PC on the LAN). **All waiting** shows boards on other networks too.
+3. **Connect.** Press **Connect** on a board, then set its node ID (suggested `ESP32-<last 6 of MAC>`), location, floor, owner and spot, and press **Connect**. The board gets its own **per-node device key** in the reply to its next announce, saves it, and starts sending to `/api/ingest`. The location is managed on the website from then on.
+- **Delete** on a node revokes its key. The board then announces again and reappears under Add node. Hold **BOOT** for 5 s to make a board forget its Wi-Fi and pairing.
+- **API (admins):** `GET /api/devices/discovered?scope=network|all`, `POST /api/devices/{mac}/approve` (same body as `POST /api/nodes`), `DELETE /api/devices/{mac}`.
+- **Without hardware:** `python tools/dummy_esp32.py --pair --url https://<project>.vercel.app/api/ingest` behaves like a new wireless board.
+- The manual set-up below still works: a board with `DEVICE_KEY` in `secrets.h` skips pairing.
+
 **Floor plans and node management (admin).**
 - **Admin dashboard:** shows a **top-view floor plan** for each floor (all side by side, or one large). Each node is a dot at its spot, coloured by status. Click a dot to see its readings.
 - **Adding a node:** on **Sensor nodes**, **Add node** registers a node before it reports. You set its ID (the sketch's `NODE_ID`), location, floor, the account it belongs to, and its spot, by clicking on that floor's plan.
@@ -188,10 +200,10 @@ Every request must carry the secret, so the URL alone is not enough to write to 
 ## Tests
 
 ```bash
-cd backend && python -m pytest        # 148 API tests, in-memory MongoDB
+cd backend && python -m pytest        # 154 API tests, in-memory MongoDB
 ```
 
-End-to-end (Playwright, 53 tests in `frontend/e2e`):
+End-to-end (Playwright, 56 tests in `frontend/e2e`):
 
 ```bash
 cd frontend

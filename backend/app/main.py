@@ -15,7 +15,7 @@ from pymongo.errors import DuplicateKeyError
 
 from . import db
 from .config import Settings, get_settings, set_settings
-from .routers import admin, auth, monitoring, profile
+from .routers import admin, auth, devices, monitoring, profile
 from .security import hash_password
 from .services import pipeline, sheets, tasks
 from .services.mqtt import MqttService
@@ -191,5 +191,6 @@ def create_app(settings: Settings | None = None, start_background: bool = True, 
     app.include_router(monitoring.router)
     app.include_router(admin.router)
     app.include_router(profile.router)
+    app.include_router(devices.router)
     return app
 # Run with: uvicorn app.main:create_app --factory

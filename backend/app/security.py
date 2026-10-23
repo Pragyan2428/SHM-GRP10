@@ -1,6 +1,7 @@
 """Password hashing, JWT sessions in HttpOnly cookies, role checks, login lockout."""
 from __future__ import annotations
 
+import hashlib
 import hmac
 from datetime import timedelta
 from typing import Optional
@@ -155,6 +156,19 @@ async def device_owner(node_id: str, presented: Optional[str], settings: Setting
     """The account whose personal device key was presented, or None for the site-wide
     DEVICE_SHARED_KEY / DEVICE_KEYS (the admin's own devices). Raises 401/503 otherwise."""
     if presented:
+        # A key handed to this one node when an admin connected it from the website (Add node > Nearby)
+        node = await get_db().sensor_nodes.find_one(
+            {"node_id": node_id.upper(), "device_key_hash": hashlib.sha256(presented.encode()).hexdigest()},
+            {"_id": 0, "owner_id": 1, "mac": 1})
+        if node:
+            if node.get("mac"):  # paired and reporting: the waiting-list entry (and its copy of the key) can go
+                await get_db().pending_devices.delete_one({"mac": node["mac"], "status": "approved"})
+            if not node.get("owner_id"):
+                return None
+            owner = await get_db().users.find_one({"id": node["owner_id"]}, {"_id": 0, "id": 1, "active": 1})
+            if not owner or not owner.get("active", True):
+                raise HTTPException(status.HTTP_401_UNAUTHORIZED, "This node belongs to a disabled account")
+            return owner
         owner = await get_db().users.find_one({"device_key": presented}, {"_id": 0, "id": 1, "active": 1, "device_key": 1})
         if owner and hmac.compare_digest(owner["device_key"].encode(), presented.encode()):
             if not owner.get("active", True):

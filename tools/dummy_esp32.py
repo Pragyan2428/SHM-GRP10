@@ -7,6 +7,9 @@ hardware. Standard library only.
     python tools/dummy_esp32.py                                   # API on this PC
     python tools/dummy_esp32.py --url http://10.7.209.43:8000/api/ingest
     python tools/dummy_esp32.py --breach-every 12                 # strain alert every 12th reading
+    python tools/dummy_esp32.py --pair --url https://<project>.vercel.app/api/ingest
+        # like a new wireless board: shows up under Add node > Nearby devices, waits for
+        # an admin to press Connect, then sends readings with the key it was given
 
 The device key comes from --key (your personal key from the website, so the node shows up
 on your own dashboard), SHM_DEVICE_KEY, or else backend/.env (a DEVICE_KEYS entry for this
@@ -74,8 +77,8 @@ class Node:
 
 
 def post(url: str, key: str, payload: dict, timeout: float) -> tuple[int, dict]:
-    req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST",
-                                 headers={"Content-Type": "application/json", "X-Device-Key": key})
+    headers = {"Content-Type": "application/json", **({"X-Device-Key": key} if key else {})}
+    req = urllib.request.Request(url, data=json.dumps(payload).encode(), method="POST", headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as res:
             return res.status, json.loads(res.read() or b"{}")
@@ -85,6 +88,27 @@ def post(url: str, key: str, payload: dict, timeout: float) -> tuple[int, dict]:
         except ValueError:
             body = {}
         return err.code, body
+
+
+def pair(args) -> tuple[str, str]:
+    """Announce every 5 s until an admin presses Connect; returns (node_id, device_key)."""
+    rng = random.Random()
+    mac = (args.mac or "02:" + ":".join(f"{rng.randrange(256):02X}" for _ in range(5))).upper()
+    url = args.url.rstrip("/").removesuffix("/api/ingest") + "/api/devices/announce"
+    body = {"mac": mac, "claim_secret": "dummy" + mac.replace(":", "") + "x" * 4, "firmware": "dummy-2.0",
+            "rssi": -55, "local_ip": "192.168.1.250", "sensors": list(SENSORS)}
+    print(f"Announcing {mac} to {url}. Open the website: Sensor nodes > Add node > Nearby devices > Connect", flush=True)
+    while True:
+        try:
+            status, reply = post(url, "", body, timeout=10)
+        except (urllib.error.URLError, OSError) as err:
+            print(f"cannot reach API: {getattr(err, 'reason', err)}", flush=True)
+        else:
+            if status == 200 and reply.get("status") == "approved":
+                print(f"Connected as {reply['node_id']} ({reply.get('location') or 'no location'})", flush=True)
+                return reply["node_id"], reply["device_key"]
+            print(f"waiting ({status} {reply.get('status') or reply.get('detail', '')})", flush=True)
+        time.sleep(5)
 
 
 def main() -> None:
@@ -98,9 +122,16 @@ def main() -> None:
     ap.add_argument("--breach-every", type=int, default=0, metavar="N",
                     help="send a strain reading over the limit every Nth message (0 = never)")
     ap.add_argument("--count", type=int, default=0, help="stop after this many messages (0 = run forever)")
+    ap.add_argument("--pair", action="store_true",
+                    help="no key: announce like a new wireless ESP32 and wait to be connected on the website")
+    ap.add_argument("--mac", help="MAC address to announce with --pair (default: a random one)")
     args = ap.parse_args()
 
-    key = args.key or device_key(args.node)
+    if args.pair:
+        args.node, key = pair(args)
+        args.location = None  # a paired node's location is set on the website
+    else:
+        key = args.key or device_key(args.node)
     node = Node(random.Random())
     print(f"Dummy node {args.node} -> {args.url} every {args.interval:g}s (Ctrl+C to stop)", flush=True)
     sent = 0
@@ -109,7 +140,7 @@ def main() -> None:
             sent += 1
             breach = args.breach_every > 0 and sent % args.breach_every == 0
             payload = {
-                "node_id": args.node, "location": args.location, "readings": node.readings(breach),
+                "node_id": args.node, **({"location": args.location} if args.location else {}), "readings": node.readings(breach),
                 "battery": round(node.battery, 1), "rssi": max(-100, min(-30, int(node.rng.gauss(-58, 5)))),
                 "firmware": "dummy-1.0",
             }

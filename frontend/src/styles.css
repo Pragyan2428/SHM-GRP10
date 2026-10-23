@@ -983,3 +983,5 @@ input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
 .nearby-list li.selected { border-color: var(--accent); }
 .nearby-meta { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .ble-setup { padding: 10px; border: 1px dashed var(--line-2); border-radius: 10px; }
+.ud-connect-form { display: flex; flex-direction: column; gap: 10px; max-width: 460px; }
+.ud-connect .nearby { color: var(--text); } /* a dark panel inside the light user card: keep its text light */

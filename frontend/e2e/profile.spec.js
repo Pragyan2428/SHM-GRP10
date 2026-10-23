@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { ADMIN, API_PORT, DEVICE_KEY } from './env.js'
+import { ADMIN, API_PORT } from './env.js'
 import { ingest, login, logout, myDeviceKey, uniqueNode } from './helpers.js'
 
 const PASSWORD = 'Profile-Pass-0001'
@@ -148,32 +148,39 @@ test('the user dashboard has the sidebar, KPI cards, chart, node table and map',
   await expect(page.getByTestId('user-empty-state')).toBeVisible()
 })
 
-test('a new account sees only how to connect its ESP32, then only its own node', async ({ page, request }) => {
+test('a new user connects their own ESP32 from their page, with no keys or commands', async ({ page, request }) => {
   const others = uniqueNode()
   await ingest(request, others, { strain: 400 }) // a node of the site, not of this account
   await newUser(page, 'Fresh Account')
-  const empty = page.getByTestId('user-no-nodes')
-  await expect(empty).toBeVisible()
+  await expect(page.getByTestId('user-no-nodes')).toBeVisible()
   await expect(page.getByTestId('ud-map')).toHaveCount(0) // no building until a node of theirs reports
-  await expect(page.getByTestId('device-secrets')).toContainText(`${new URL(page.url()).origin}/api/ingest`)
-  await expect(page.getByTestId('device-key')).toContainText('••••') // hidden until asked
-  await page.getByTestId('device-key-toggle').click()
-  const key = await myDeviceKey(page)
-  await expect(page.getByTestId('device-key')).toHaveText(key)
-  await expect(page.getByTestId('device-secrets')).toContainText(key)
+  const card = page.getByTestId('add-my-node')
+  await expect(card).toContainText('Add your ESP32')
+  await expect(card.getByTestId('nearby-ble-toggle')).toBeVisible() // Bluetooth set-up offered
+  await expect(card.getByTestId('nearby-scope-all')).toHaveCount(0) // users only see their own Wi-Fi
+  await expect(page.getByText(/device key|secrets\.h|python tools/i)).toHaveCount(0) // nothing to copy
 
-  const mine = uniqueNode()
-  await ingest(request, mine, { strain: 300 }, key)
-  await expect(page.getByTestId(`user-node-card-${mine}`)).toBeVisible({ timeout: 15_000 }) // appears on its own
+  // a board on the same Wi-Fi announces itself, the user connects it and its readings appear
+  const hex = Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0').toUpperCase()
+  const mac = `24:6F:28:${hex.slice(0, 2)}:${hex.slice(2, 4)}:${hex.slice(4, 6)}`
+  const announce = () => request.post(`http://127.0.0.1:${API_PORT}/api/devices/announce`,
+    { data: { mac, claim_secret: `user${hex}secretvalue`, firmware: '2.0.0', rssi: -50, local_ip: '192.168.1.60' } })
+  expect((await announce()).status()).toBe(200)
+  const short = mac.replace(/:/g, '').toLowerCase()
+  await card.getByTestId(`nearby-connect-${short}`).click()
+  await expect(card.getByTestId('my-node-name-input')).toHaveValue(`ESP32-${hex}`)
+  await card.getByTestId('my-node-location-input').fill('2nd floor - column C2')
+  await card.getByTestId('my-node-connect-button').click()
+  await expect(page.getByTestId('my-node-connected-toast')).toBeVisible()
+
+  const reply = await (await announce()).json() // the board's next announce gives it its key
+  expect(reply.status).toBe('approved')
+  const r = await request.post(`http://127.0.0.1:${API_PORT}/api/ingest`,
+    { headers: { 'X-Device-Key': reply.device_key }, data: { node_id: reply.node_id, readings: { strain: 300 } } })
+  expect(r.status()).toBe(200)
+  const id = `ESP32-${hex}`
+  await expect(page.getByTestId(`user-node-card-${id}`)).toBeVisible({ timeout: 15_000 }) // appears on its own
   await expect(page.getByTestId(`user-node-card-${others}`)).toHaveCount(0)
-  await expect(page.getByTestId('ud-map').getByTestId(`map-pin-${mine.toLowerCase()}`)).toBeVisible()
-  await expect(page.locator('[data-testid^="user-node-card-"]')).toHaveCount(1)
-  await expect(page.getByTestId('connect-device')).toContainText('Connect another ESP32')
-
-  // nobody else can send as this node, not even with the site-wide key
-  const r = await request.post(`http://127.0.0.1:${API_PORT}/api/ingest`, {
-    headers: { 'X-Device-Key': DEVICE_KEY }, data: { node_id: mine, readings: { strain: 1 } },
-  })
-  expect(r.status()).toBe(409)
-  expect((await r.json()).detail).toContain('different NODE_ID')
+  await expect(page.getByTestId('ud-map').getByTestId(`map-pin-${id.toLowerCase()}`)).toHaveAttribute('data-floor', '2')
+  await expect(page.getByTestId('add-my-node')).toContainText('Add another ESP32')
 })

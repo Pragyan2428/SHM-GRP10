@@ -122,7 +122,7 @@ function BluetoothSetup({ onDone }) {
   )
 }
 
-export default function NearbyDevices({ selectedMac, onPick }) {
+export default function NearbyDevices({ selectedMac, onPick, userMode = false }) {
   const [scope, setScope] = useState('network')
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -147,9 +147,11 @@ export default function NearbyDevices({ selectedMac, onPick }) {
         </h3>
         <div className="pill-tabs" role="group" aria-label="Which devices">
           <button type="button" className="pill-tab" aria-pressed={scope === 'network'} onClick={() => setScope('network')} data-testid="nearby-scope-network">Same Wi-Fi</button>
-          <button type="button" className="pill-tab" aria-pressed={scope === 'all'} onClick={() => setScope('all')} data-testid="nearby-scope-all">
-            All waiting{data && scope === 'network' && data.other_networks ? ` (+${data.other_networks})` : ''}
-          </button>
+          {userMode ? null : (
+            <button type="button" className="pill-tab" aria-pressed={scope === 'all'} onClick={() => setScope('all')} data-testid="nearby-scope-all">
+              All waiting{data && scope === 'network' && data.other_networks ? ` (+${data.other_networks})` : ''}
+            </button>
+          )}
           <button type="button" className="pill-tab" aria-pressed={ble} onClick={() => setBle((b) => !b)} data-testid="nearby-ble-toggle">
             <Bluetooth size={12} aria-hidden="true" /> Set up over Bluetooth
           </button>
@@ -163,7 +165,7 @@ export default function NearbyDevices({ selectedMac, onPick }) {
           : items.length === 0 ? (
             <p className="small dim" data-testid="nearby-empty">
               <Loader2 size={13} className="spin" aria-hidden="true" /> Searching… Power on an ESP32 with the SHM firmware.
-              No Wi-Fi on it yet? Use <strong>Set up over Bluetooth</strong>. Already on Wi-Fi but not listed? Try <strong>All waiting</strong>.
+              No Wi-Fi on it yet? Use <strong>Set up over Bluetooth</strong>.{userMode ? ' Make sure this device and the ESP32 use the same Wi-Fi.' : <> Already on Wi-Fi but not listed? Try <strong>All waiting</strong>.</>}
             </p>
           ) : (
             <ul className="nearby-list" data-testid="nearby-list">

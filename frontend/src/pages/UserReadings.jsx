@@ -8,10 +8,10 @@ import { AlertTriangle, ArrowDownRight, ArrowUpRight, Building2, CheckCircle2, G
 import { BrandMark } from '../components/Layout'
 import { PARAM_ICON } from '../components/monitoring'
 import ProfileMenu, { Avatar } from '../components/ProfileMenu'
-import ConnectDevice from '../components/ConnectDevice'
+import AddMyNode from '../components/AddMyNode'
 import MyAlerts from '../components/MyAlerts'
 import { IsoBuilding, floorName, placeNodes } from '../components/twin'
-import { Banner, EmptyState, Loading } from '../components/ui'
+import { Banner, EmptyState, Loading, Toasts } from '../components/ui'
 import { api } from '../lib/api'
 import { HIDDEN_POLL_MS, useAuth } from '../lib/context'
 import { PARAMS, PARAM_SHORT, SENSOR, UNITS, fmtAgo, fmtNum, fmtTime, fmtValue } from '../lib/format'
@@ -233,7 +233,7 @@ export default function UserReadings() {
 
         {!data ? <Loading label="Loading readings…" testid="user-loading-state" /> : data.total_nodes === 0 ? (
           <div className="ud-empty-start" data-testid="user-no-nodes">
-            <ConnectDevice user={user} open />
+            <AddMyNode open onConnected={load} />
             <MyAlerts />
           </div>
         ) : (
@@ -350,10 +350,11 @@ export default function UserReadings() {
             </section>
 
             <MyAlerts />
-            <ConnectDevice user={user} open={false} />
+            <AddMyNode open={false} onConnected={load} />
           </>
         )}
       </main>
+      <Toasts />
     </div>
   )
 }

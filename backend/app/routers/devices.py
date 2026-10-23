@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field, field_validator
 from ..config import Settings, get_settings
 from ..db import as_utc, audit, clean, get_db, utcnow
 from ..models import NodeCreate
-from ..security import require_admin
+from ..security import current_user, require_admin
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
 
@@ -137,9 +137,12 @@ async def announce(body: Announce, request: Request):
 
 
 @router.get("/discovered")
-async def discovered(request: Request, user: dict = Depends(require_admin),
+async def discovered(request: Request, user: dict = Depends(current_user),
                      scope: str = Query("network", pattern="^(network|all)$")):
-    """Unpaired ESP32s that announced in the last few seconds; by default only those on the admin's network."""
+    """Unpaired ESP32s that announced in the last few seconds; by default only those on the caller's network.
+    Users can only ever see devices on their own network; admins can also list every waiting device."""
+    if scope == "all" and user.get("role") != "admin":
+        raise HTTPException(403, "Only administrators can list devices on other networks")
     admin_ip = client_ip(request)
     since = utcnow() - timedelta(seconds=LIVE_SECONDS)
     rows = await get_db().pending_devices.find({"status": "waiting", "last_seen": {"$gte": since}}, {"_id": 0}) \
@@ -148,13 +151,16 @@ async def discovered(request: Request, user: dict = Depends(require_admin),
     others = sum(1 for i in items if not i["same_network"])
     if scope == "network":
         items = [i for i in items if i["same_network"]]
+    if user.get("role") != "admin":
+        return {"items": items, "other_networks": 0}
     return {"items": items, "other_networks": others, "your_ip": admin_ip}
 
 
 @router.post("/{mac}/approve", status_code=201)
-async def approve(mac: str, body: NodeCreate, user: dict = Depends(require_admin),
+async def approve(mac: str, body: NodeCreate, request: Request, user: dict = Depends(current_user),
                   settings: Settings = Depends(get_settings)):
-    """Turn a discovered ESP32 into a sensor node. The device picks up its key on its next announce."""
+    """Turn a discovered ESP32 into a sensor node. The device picks up its key on its next announce.
+    A user connects a device on their own network to themselves; an admin can connect any and pick the owner."""
     from .monitoring import _node_view, _owner_or_none  # avoid an import cycle at module load
 
     db = get_db()
@@ -162,6 +168,10 @@ async def approve(mac: str, body: NodeCreate, user: dict = Depends(require_admin
     pending = await db.pending_devices.find_one({"mac": mac}, {"_id": 0})
     if not pending or pending.get("status") != "waiting":
         raise HTTPException(404, "That device is no longer waiting to be connected. Check it is powered and on Wi-Fi.")
+    if user.get("role") != "admin":
+        if not same_network(pending.get("public_ip"), client_ip(request)):
+            raise HTTPException(404, "That device is not on your Wi-Fi")
+        body.owner_id = user["id"]  # a user's device is always theirs
     if await db.sensor_nodes.find_one({"node_id": body.node_id}, {"_id": 1}):
         raise HTTPException(409, f"A node called {body.node_id} already exists")
 

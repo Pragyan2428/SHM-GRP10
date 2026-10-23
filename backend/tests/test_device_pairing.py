@@ -91,8 +91,21 @@ def test_local_network_api_lists_lan_devices(api):
     assert [d["mac"] for d in items] == [MAC]
 
 
-def test_only_admins_see_and_connect_devices(api):
-    announce(api)
+def test_a_user_connects_an_esp32_on_their_own_wifi_to_themselves(api):
+    announce(api)                                                          # on the user's Wi-Fi
+    announce(api, mac="24:6F:28:00:00:02", secret="y" * 20, headers=ELSEWHERE)  # a neighbour's
     api.login(VIEWER)
-    assert api.get("/api/devices/discovered").status_code == 403
-    assert api.post(f"/api/devices/{MAC}/approve", json={"node_id": "X-01"}).status_code == 403
+    found = api.get("/api/devices/discovered", headers=HOME).json()
+    assert [d["mac"] for d in found["items"]] == [MAC] and found["other_networks"] == 0
+    assert api.get("/api/devices/discovered", params={"scope": "all"}, headers=HOME).status_code == 403
+    assert api.post("/api/devices/24:6F:28:00:00:02/approve", json={"node_id": "NOPE-01"}, headers=HOME).status_code == 404
+
+    # connecting makes it the user's own, whatever owner is asked for
+    r = api.post(f"/api/devices/{MAC}/approve", json={"node_id": "MY-01", "location": "2nd floor - column C2", "owner_id": None},
+                 headers=HOME)
+    assert r.status_code == 201, r.text
+    key = announce(api).json()["device_key"]
+    assert api.post("/api/ingest", json=reading("MY-01"), headers={"X-Device-Key": key}).status_code == 200
+    mine = api.get("/api/telemetry").json()["nodes"]
+    assert [(n["node_id"], n["floor"]) for n in mine] == [("MY-01", 2)]
+    assert api.delete(f"/api/devices/{MAC}").status_code == 403  # forgetting devices stays an admin action

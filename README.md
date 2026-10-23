@@ -204,7 +204,7 @@ Every request must carry the secret, so the URL alone is not enough to write to 
 cd backend && python -m pytest        # 156 API tests, in-memory MongoDB
 ```
 
-End-to-end (Playwright, 60 tests in `frontend/e2e`):
+End-to-end (Playwright, 61 tests in `frontend/e2e`):
 
 ```bash
 cd frontend

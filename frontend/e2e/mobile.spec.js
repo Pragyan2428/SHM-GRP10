@@ -87,3 +87,17 @@ test('the back-to-top button is only on the About page', async ({ page }) => {
   await expect(page.getByTestId('login-page')).toBeVisible()
   await expect(page.getByTestId('scroll-top')).toHaveCount(0)
 })
+
+test('the About page opens the 3D sensor node full screen and takes it apart', async ({ page }) => {
+  await page.goto('/about')
+  await page.getByTestId('about-view-3d').click()
+  const viewer = page.getByTestId('node-viewer')
+  await expect(viewer).toBeVisible()
+  await expect(viewer.getByTestId('node3d-viewer').or(viewer.locator('svg.exploded'))).toBeVisible()
+  await viewer.getByTestId('node-viewer-assemble').click()
+  await expect(viewer.getByTestId('node-viewer-slider')).toHaveValue('0')
+  await viewer.getByTestId('node-viewer-explode').click()
+  await expect(viewer.getByTestId('node-viewer-slider')).toHaveValue('100')
+  await page.keyboard.press('Escape')
+  await expect(viewer).toHaveCount(0)
+})

@@ -28,16 +28,27 @@
       html.intro-on #intro {
         display: flex; position: fixed; inset: 0; z-index: 9999; align-items: center; justify-content: center; cursor: pointer;
         color: #eef0f3; font-family: Manrope, Inter, system-ui, sans-serif;
-        background:
-          radial-gradient(520px 340px at 50% 46%, rgba(8, 9, 11, .82), rgba(8, 9, 11, .35) 70%, transparent),
-          linear-gradient(180deg, rgba(8, 9, 11, .55), rgba(8, 9, 11, .2) 40%, rgba(8, 9, 11, .85)),
-          url('/images/intro-tower.webp') center 30% / cover no-repeat,
-          #08090b;
+        background: #08090b; overflow: hidden;
         transition: transform .75s cubic-bezier(.76, 0, .24, 1), opacity .75s ease;
       }
       #intro.intro-leave { transform: translateY(-100%); }
       #intro.intro-leave .intro-stage { opacity: 0; transform: translateY(-30px) scale(.98); }
-      .intro-stage { display: flex; flex-direction: column; align-items: center; gap: 26px; padding: 24px; transition: opacity .45s ease, transform .6s ease; }
+      /* the photo: a blurred wash filling the screen, the sharp tower in the middle slowly
+         settling into place, and a warm light that drifts up its glowing edge */
+      .intro-bg, .intro-photo, .intro-shade, .intro-glow { position: absolute; inset: 0; pointer-events: none; }
+      .intro-bg { background: url('/images/intro-tower.webp') center 30% / cover no-repeat; filter: blur(28px) saturate(1.2) brightness(.45); transform: scale(1.15); opacity: 0; animation: intro-fade 1s ease .05s forwards; }
+      .intro-photo { width: 62vh; max-width: 100%; margin: 0 auto; background: url('/images/intro-tower.webp') center 18% / cover no-repeat; opacity: 0; transform: scale(1.12) translateY(3%);
+        -webkit-mask-image: linear-gradient(90deg, transparent, #000 28%, #000 72%, transparent); mask-image: linear-gradient(90deg, transparent, #000 28%, #000 72%, transparent);
+        animation: intro-fade .9s ease .1s forwards, intro-settle 3.4s cubic-bezier(.22, 1, .36, 1) forwards; }
+      .intro-shade { background: radial-gradient(420px 300px at 50% 47%, rgba(8, 9, 11, .8), rgba(8, 9, 11, .3) 70%, transparent), linear-gradient(180deg, rgba(8, 9, 11, .5), transparent 35%, transparent 60%, rgba(8, 9, 11, .9)); }
+      .intro-glow { background: radial-gradient(160px 260px at 50% 50%, rgba(255, 122, 26, .35), transparent 70%); mix-blend-mode: screen; opacity: 0; animation: intro-glow 2.6s ease-in-out .5s infinite; }
+      @keyframes intro-fade { to { opacity: 1; } }
+      @keyframes intro-settle { to { transform: none; } }
+      @keyframes intro-glow { 0% { opacity: 0; transform: translateY(35%); } 40% { opacity: .9; } 100% { opacity: 0; transform: translateY(-40%); } }
+      @media (max-aspect-ratio: 1/1) {
+        .intro-photo { width: auto; background-position: center 30%; -webkit-mask-image: none; mask-image: none; }
+      }
+      .intro-stage { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 26px; padding: 24px; transition: opacity .45s ease, transform .6s ease; }
       .intro-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
       .intro-building { width: min(240px, 62vw); height: auto; overflow: visible; }
       .intro-building .i-draw, .intro-building .i-ground { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 700; stroke-dashoffset: 700; animation: intro-draw .9s cubic-bezier(.65, 0, .35, 1) forwards; animation-delay: var(--d, 0s); }
@@ -66,6 +77,8 @@
       html.intro-reduced .intro-building .i-dot { transform: none; }
       html.intro-reduced .intro-brand { opacity: 1; transform: none; }
       html.intro-reduced .intro-bar span { width: 100%; }
+      html.intro-reduced .intro-bg, html.intro-reduced .intro-photo { opacity: 1; transform: none; }
+      html.intro-reduced .intro-glow { display: none; }
       html.intro-reduced #intro.intro-leave { transform: none; opacity: 0; }
     </style>
   </head>
@@ -74,6 +87,7 @@
 
     <div id="intro" data-testid="intro" role="status" aria-live="polite">
       <span class="intro-sr">Loading Smart Structural Health Monitoring System</span>
+      <div class="intro-bg"></div><div class="intro-photo"></div><div class="intro-shade"></div><div class="intro-glow"></div>
       <div class="intro-stage" aria-hidden="true">
         <svg class="intro-building" viewBox="0 0 220 175">
           <line class="i-ground" x1="8" y1="162" x2="212" y2="162" />

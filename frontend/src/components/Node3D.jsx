@@ -1,6 +1,8 @@
 // 3D model of one Smart SHM sensor node (three.js). It starts closed; as the page scrolls
 // through `sectionRef`, the lid lifts off and each part rises out of the enclosure in turn,
 // with its name appearing beside it. Loaded lazily, so three.js only ships with the About page.
+// With `explode` (0 = closed, 1 = apart) it is a viewer instead: drag to turn it, wheel or
+// pinch to zoom, and the slider decides how far apart the parts are.
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
@@ -135,12 +137,15 @@ function hasWebGL() {
   }
 }
 
-export default function Node3D({ sectionRef, onReveal, fallback = null }) {
+export default function Node3D({ sectionRef, onReveal, fallback = null, explode = null, viewRef = null }) {
   const wrapRef = useRef(null)
   const labelRefs = useRef({})
   const lineRefs = useRef({})
   const onRevealRef = useRef(onReveal)
   onRevealRef.current = onReveal
+  const explodeRef = useRef(explode)
+  explodeRef.current = explode
+  const viewer = explode !== null
   const [failed, setFailed] = useState(() => typeof window !== 'undefined' && !hasWebGL())
 
   useEffect(() => {
@@ -210,7 +215,39 @@ export default function Node3D({ sectionRef, onReveal, fallback = null }) {
     let raf = 0
     const start = performance.now()
 
+    // viewer: drag to orbit, wheel / pinch to zoom; it turns slowly on its own until touched
+    const startZoom = () => (wrap.clientWidth < wrap.clientHeight ? 1.3 : 1) // tall phone screens: step back a little
+    const orbit = { az: 0, el: 0, zoom: startZoom(), touched: false }
+    const pointers = new Map()
+    let pinch = 0
+    const down = (e) => { pointers.set(e.pointerId, [e.clientX, e.clientY]); orbit.touched = true; wrap.setPointerCapture?.(e.pointerId) }
+    const move = (e) => {
+      const prev = pointers.get(e.pointerId)
+      if (!prev) return
+      pointers.set(e.pointerId, [e.clientX, e.clientY])
+      if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()]
+        const d = Math.hypot(a[0] - b[0], a[1] - b[1])
+        if (pinch) orbit.zoom = Math.max(0.45, Math.min(2.2, orbit.zoom * (pinch / d)))
+        pinch = d
+        return
+      }
+      orbit.az -= (e.clientX - prev[0]) * 0.008
+      orbit.el = Math.max(-0.42, Math.min(0.85, orbit.el + (e.clientY - prev[1]) * 0.006))
+    }
+    const up = (e) => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = 0 }
+    const wheel = (e) => { e.preventDefault(); orbit.touched = true; orbit.zoom = Math.max(0.45, Math.min(2.2, orbit.zoom * Math.exp(e.deltaY * 0.0012))) }
+    if (viewer) {
+      wrap.addEventListener('pointerdown', down)
+      wrap.addEventListener('pointermove', move)
+      wrap.addEventListener('pointerup', up)
+      wrap.addEventListener('pointercancel', up)
+      wrap.addEventListener('wheel', wheel, { passive: false })
+      if (viewRef) viewRef.current = { reset: () => Object.assign(orbit, { az: 0, el: 0, zoom: startZoom(), touched: false }) }
+    }
+
     const progress = () => {
+      if (explodeRef.current !== null) return explodeRef.current
       if (reduce) return 1
       const el = sectionRef?.current
       if (!el) return 0
@@ -226,6 +263,7 @@ export default function Node3D({ sectionRef, onReveal, fallback = null }) {
       smoothP += (p - smoothP) * 0.12
       const sp = smoothP
       const time = (performance.now() - start) / 1000
+      if (viewer && !orbit.touched && !reduce) orbit.az += 0.0025
 
       // each part lifts out in turn: lid first, base never moves
       let shown = 0
@@ -243,9 +281,9 @@ export default function Node3D({ sectionRef, onReveal, fallback = null }) {
       // camera pulls back and up as the stack grows, and pans so the model sits left of the labels
       const ease = smooth(0, 1, sp)
       const aspectBoost = camera.aspect < 1 ? Math.pow(1 / camera.aspect, 0.85) : 1
-      const dist = lerp(14, 21, ease) * aspectBoost
-      const elev = 0.5
-      const az = 0.75
+      const dist = lerp(14, 21, ease) * aspectBoost * orbit.zoom
+      const elev = 0.5 + orbit.el
+      const az = 0.75 + orbit.az
       const pan = dist * (camera.aspect >= 1 ? 0.12 : 0.07) * ease
       target.set(Math.cos(az) * pan, lerp(0.7, 4.0, ease), -Math.sin(az) * pan)
       camera.position.set(target.x + Math.sin(az) * Math.cos(elev) * dist, target.y + Math.sin(elev) * dist, target.z + Math.cos(az) * Math.cos(elev) * dist)
@@ -301,6 +339,13 @@ export default function Node3D({ sectionRef, onReveal, fallback = null }) {
 
     return () => {
       cancelAnimationFrame(raf)
+      if (viewer) {
+        wrap.removeEventListener('pointerdown', down)
+        wrap.removeEventListener('pointermove', move)
+        wrap.removeEventListener('pointerup', up)
+        wrap.removeEventListener('pointercancel', up)
+        wrap.removeEventListener('wheel', wheel)
+      }
       ro.disconnect()
       io.disconnect()
       scene.traverse((o) => {
@@ -311,12 +356,12 @@ export default function Node3D({ sectionRef, onReveal, fallback = null }) {
       renderer.dispose()
       renderer.domElement.remove()
     }
-  }, [failed, sectionRef])
+  }, [failed, sectionRef, viewer, viewRef])
 
   if (failed) return fallback
   return (
-    <div className="n3d" ref={wrapRef} data-testid="node3d" role="img"
-      aria-label="3D model of a sensor node that comes apart as you scroll: lid, DS18B20, ADXL345, HX711, ESP32, battery and base enclosure">
+    <div className={`n3d ${viewer ? 'n3d-viewer' : ''}`} ref={wrapRef} data-testid={viewer ? 'node3d-viewer' : 'node3d'} role="img"
+      aria-label={`3D model of a sensor node${viewer ? ', drag to turn it' : ' that comes apart as you scroll'}: lid, DS18B20, ADXL345, HX711, ESP32, battery and base enclosure`}>
       <svg className="n3d-lines" aria-hidden="true">
         {PARTS.map((p) => (
           <g key={p.key} ref={(el) => { lineRefs.current[p.key] = el }} style={{ opacity: 0 }}>
@@ -327,7 +372,7 @@ export default function Node3D({ sectionRef, onReveal, fallback = null }) {
       </svg>
       <div className="n3d-labels" aria-hidden="true">
         {PARTS.map((p) => (
-          <div key={p.key} className="n3d-label" ref={(el) => { labelRefs.current[p.key] = el }} data-testid={`node3d-label-${p.key}`} data-visible="false">
+          <div key={p.key} className="n3d-label" ref={(el) => { labelRefs.current[p.key] = el }} data-testid={`${viewer ? 'viewer' : 'node3d'}-label-${p.key}`} data-visible="false">
             <span className="n3d-text"><strong>{p.name}</strong><span>{p.sub}</span></span>
           </div>
         ))}

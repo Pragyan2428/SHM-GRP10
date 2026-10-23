@@ -41,7 +41,7 @@ export default function UserStructure() {
       {t.building_photo ? (
         <section className="panel" aria-labelledby="us-photo">
           <div className="panel-head"><h2 id="us-photo">Photo of the building</h2></div>
-          <div className="panel-body"><img className="us-photo" src={buildingPhotoUrl(t.building_photo, userId)} alt={`Photo of ${u.name}’s building`} data-testid="user-structure-photo" /></div>
+          <div className="panel-body"><div className="us-photo-wrap"><img className="us-photo" src={buildingPhotoUrl(t.building_photo, userId)} alt={`Photo of ${u.name}’s building`} data-testid="user-structure-photo" /></div></div>
         </section>
       ) : null}
 

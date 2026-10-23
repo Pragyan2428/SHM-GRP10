@@ -1,13 +1,14 @@
 import { Suspense, lazy, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Activity, ArrowRight, BatteryCharging, Bell, CircleDollarSign, Cloud, Cpu, Gauge, History, IndianRupee,
+  Activity, ArrowRight, BatteryCharging, Box, Bell, CircleDollarSign, Cloud, Cpu, Gauge, History, IndianRupee,
   Layers, LayoutDashboard, Mail, MessageCircle, MonitorSmartphone, Puzzle, Radio, ShieldAlert, Sparkles, Thermometer, Users, Waves, Wifi,
   Wrench,
 } from 'lucide-react'
 import ExplodedNode from '../components/ExplodedNode'
 import { BrandMark } from '../components/Layout'
 import ScrollTop from '../components/ScrollTop'
+import NodeViewer from '../components/NodeViewer'
 import { useAuth } from '../lib/context'
 
 // three.js is only downloaded when the About page is opened.
@@ -119,6 +120,7 @@ export default function About() {
   const home = user ? (user.role === 'admin' ? '/' : '/user') : null
   const scrollyRef = useRef(null)
   const [revealed, setRevealed] = useState([])
+  const [viewing, setViewing] = useState(false)
   const reduceMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
   return (
@@ -160,6 +162,9 @@ export default function About() {
                 <Link to={home || '/login'} className="btn btn-pill btn-accent about-cta-btn">
                   {home ? `Open ${user.role === 'admin' ? 'dashboard' : 'readings'}` : 'Open the live dashboard'}
                 </Link>
+                <button type="button" className="btn btn-pill about-outline about-view-3d" onClick={() => setViewing(true)} data-testid="about-view-3d">
+                  <Box size={15} aria-hidden="true" /> View the 3D model
+                </button>
                 <a href="#hardware" className="about-text-link">See the hardware ↓</a>
               </div>
               <div className="parts-progress" data-testid="parts-progress">
@@ -209,7 +214,9 @@ export default function About() {
 
         <Section id="solution" eyebrow="Proposed solution" title="What the Smart SHM system does">
           <div className="about-split">
-            <img className="about-split-img" src="/images/about-concrete.webp" alt="Concrete floors cantilevered over a column" loading="lazy" decoding="async" width="736" height="1309" />
+            <div className="about-split-media">
+              <img className="about-split-img" src="/images/about-concrete.webp" alt="Concrete floors cantilevered over a column" loading="lazy" decoding="async" width="736" height="1309" />
+            </div>
             <Cards items={SOLUTION} testid="about-solution-cards" />
           </div>
         </Section>
@@ -312,6 +319,7 @@ export default function About() {
         </section>
       </main>
       <ScrollTop />
+      {viewing ? <NodeViewer onClose={() => setViewing(false)} /> : null}
     </div>
   )
 }

@@ -21,7 +21,7 @@ test('clicking skips the intro', async ({ page }) => {
   const intro = page.getByTestId('intro')
   await expect(intro).toBeVisible()
   await intro.click()
-  await expect(intro).toHaveCount(0, { timeout: 1500 })
+  await expect(intro).toHaveCount(0, { timeout: 3000 }) // the lift-away itself takes 0.78 s
   await expect(page.getByTestId('about-page')).toBeVisible()
 })
 

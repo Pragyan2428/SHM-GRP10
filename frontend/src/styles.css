@@ -1084,14 +1084,16 @@ input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
 .about-banner figcaption { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 10px; max-width: 460px; padding: 32px; color: var(--text-2); font-size: 14.5px; line-height: 1.55; }
 .about-banner figcaption strong { font-family: var(--font-head); font-size: clamp(22px, 3vw, 32px); line-height: 1.15; letter-spacing: -.03em; color: #fff; }
 .about-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; align-items: stretch; }
-.about-split-img { width: 100%; height: 0; min-height: 100%; object-fit: cover; object-position: center 30%; border-radius: 20px; border: 1px solid var(--line); filter: grayscale(.2); }
+.about-split-media { height: 0; min-height: 100%; border-radius: 20px; border: 1px solid var(--line); overflow: hidden; }
+.about-split-img { width: 100%; height: 100%; object-fit: cover; object-position: center 30%; filter: grayscale(.2); display: block; }
 .about-split .about-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 @media (max-width: 760px) {
   .about-banner { height: 420px; }
   .about-banner::after { background: linear-gradient(0deg, rgba(8,9,11,.95) 0%, rgba(8,9,11,.75) 45%, rgba(8,9,11,.1) 80%); }
   .about-banner figcaption { justify-content: flex-end; padding: 22px; }
   .about-split { grid-template-columns: minmax(0, 1fr); }
-  .about-split-img { height: 220px; min-height: 0; object-position: center 25%; }
+  .about-split-media { height: 220px; min-height: 0; }
+  .about-split-img { object-position: center 25%; }
   .about-split .about-cards { grid-template-columns: minmax(0, 1fr); }
 }
 
@@ -1131,3 +1133,39 @@ input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
   .scroll-top { right: 16px; bottom: 16px; width: 44px; height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) { .scroll-top { transition: opacity .15s; transform: none; } }
+
+/* About: full-screen 3D model viewer */
+.about-view-3d { gap: 7px; }
+.nv { position: fixed; inset: 0; z-index: 100; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; color: var(--text);
+  background: radial-gradient(900px 600px at 50% 60%, rgba(255,122,26,.12), transparent 70%), #050506; animation: nv-in .3s ease; }
+@keyframes nv-in { from { opacity: 0; transform: scale(.985); } }
+.nv-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 24px 0; }
+.nv-head h2 { font-family: var(--font-head); font-size: 22px; letter-spacing: -.02em; }
+.nv-head p { color: var(--text-3); font-size: 13px; margin-top: 4px; }
+.nv-close { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); color: #fff; cursor: pointer; flex-shrink: 0; }
+.nv-close:hover { background: #ff7a1a; border-color: #ff7a1a; }
+.nv-stage { position: relative; min-height: 0; }
+.nv-stage .n3d { height: 100%; }
+.n3d-viewer { cursor: grab; touch-action: none; }
+.n3d-viewer:active { cursor: grabbing; }
+.nv-controls { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 14px 16px calc(18px + env(safe-area-inset-bottom)); }
+.nv-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06); color: #e8eaed; font: 600 13px var(--font-body); cursor: pointer; }
+.nv-btn:hover { border-color: rgba(255,255,255,.3); }
+.nv-btn[aria-pressed="true"] { background: #ff7a1a; border-color: #ff7a1a; color: #fff; }
+.nv-icon { padding: 9px 11px; }
+.nv-slider { width: min(320px, 60vw); display: flex; }
+.nv-slider input { min-height: 0; padding: 0; border: 0; background: transparent; accent-color: #ff7a1a; }
+@media (max-width: 720px) {
+  .nv-head { padding: 16px 16px 0; }
+  .nv-head h2 { font-size: 18px; }
+  .nv-slider { order: -1; width: 100%; }
+}
+
+/* pictures zoom in a little on hover */
+.about-banner img, .about-split-img, .ud-photo, .us-photo { transition: transform .7s cubic-bezier(.22, 1, .36, 1), filter .4s ease; }
+.about-banner:hover img, .about-split-media:hover .about-split-img, .ud-map:hover .ud-photo, .us-photo-wrap:hover .us-photo { transform: scale(1.06); }
+.about-split-media:hover .about-split-img { filter: none; }
+.us-photo-wrap { overflow: hidden; border-radius: 12px; }
+@media (prefers-reduced-motion: reduce) {
+  .about-banner img, .about-split-img, .ud-photo, .us-photo { transition: none; transform: none !important; }
+}

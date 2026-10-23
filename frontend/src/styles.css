@@ -985,3 +985,75 @@ input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
 .ble-setup { padding: 10px; border: 1px dashed var(--line-2); border-radius: 10px; }
 .ud-connect-form { display: flex; flex-direction: column; gap: 10px; max-width: 460px; }
 .ud-connect .nearby { color: var(--text); } /* a dark panel inside the light user card: keep its text light */
+.ud-id { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 3px 10px; border-radius: 999px; border: 1px solid #e3e6ea; background: #fff; color: #5b616b; font-size: 12px; font-weight: 600; cursor: pointer; }
+.ud-id .mono { color: var(--ud-ink); }
+.ud-id:hover { border-color: #cfd4da; }
+.users-find { max-width: 420px; }
+
+/* ---------- phones: a plain full-screen login / sign-up (no side panel, no card frame) ---------- */
+.auth-mobile-switch, .auth-mobile-about { display: none; }
+@media (max-width: 760px) {
+  .auth-page { padding: 0; place-items: stretch; background: var(--paper); }
+  .auth-card, .auth-card.slider { width: 100%; min-height: 100vh; min-height: 100dvh; border: 0; border-radius: 0; box-shadow: none; }
+  .auth-overlay { display: none; }
+  .auth-pane .auth-form { padding: 36px 22px 28px; justify-content: flex-start; }
+  .auth-form h1 { font-size: 28px; }
+  .auth-mobile-switch { display: block; text-align: center; margin: 4px 0 0; font-size: 14px; color: #5b616b; }
+  .auth-mobile-switch a { color: var(--accent); font-weight: 700; }
+  .auth-mobile-about { display: block; text-align: center; margin: 0; font-size: 13px; }
+  .auth-mobile-about a { color: #5b616b; display: inline-flex; align-items: center; gap: 4px; }
+}
+
+/* ---------- user dashboard: roomier layout (same colours) ---------- */
+.ud-main { padding: 30px; gap: 20px; }
+.ud-kpis, .ud-grid { gap: 16px; }
+.ud-kpi { border-radius: 20px; padding: 20px 22px; gap: 12px; }
+.ud-kpi-value { font-size: 34px; }
+.ud-card { border-radius: 20px; padding: 22px; gap: 14px; }
+.ud-sub { margin-top: -6px; }
+.ud-seg button { padding: 7px 14px; }
+.ud-select { min-height: 34px; }
+.ud-main table.data td { padding-top: 14px; padding-bottom: 14px; }
+.ud-big-row { padding-top: 12px; }
+.ud-alert-row { padding: 14px 0; }
+.ud-empty-start { gap: 20px; }
+
+/* phones: bottom tab bar, two-up stat cards, node rows as cards */
+.ud-tabbar { display: none; }
+@media (max-width: 960px) {
+  .ud-main { border-radius: 22px 22px 0 0; padding: 22px 16px 110px; gap: 18px; }
+  .ud-side { padding: 14px 16px 10px; }
+}
+@media (max-width: 720px) {
+  .ud-head { flex-wrap: nowrap; }
+  .ud-head h1 { font-size: 28px; }
+  .ud-head-actions .ud-pill { display: none; } /* About is in the profile card */
+  .ud-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .ud-kpis .ud-kpi:first-child { grid-column: 1 / -1; }
+  .ud-kpi { padding: 16px; border-radius: 18px; }
+  .ud-kpis .ud-kpi:not(:first-child) .ud-kpi-value { font-size: 26px; }
+  .ud-kpis .ud-kpi:not(:first-child) .ud-kpi-bars, .ud-kpis .ud-kpi:not(:first-child) .ud-kpi-label span { display: none; }
+  .ud-kpis .ud-kpi:not(:first-child) .ud-kpi-foot > span:last-child { display: none; }
+  .ud-kpis .ud-kpi:not(:first-child) .ud-kpi-label { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; font-size: 12px; }
+  .ud-card { padding: 18px 16px; border-radius: 18px; }
+  .ud-seg { width: 100%; }
+  .ud-seg button { flex: 1; text-align: center; }
+  .ud-big { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .ud-big-value, .ud-big-sub { grid-column: 1 / -1; }
+  .ud-big-row { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; border: 1px solid rgba(0,0,0,.06); border-radius: 14px; background: rgba(255,255,255,.55); }
+  /* each node is a small card: name on top, three readings side by side, then trend and status */
+  .ud-main table.data.responsive tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; padding: 14px; margin-bottom: 10px; border: 1px solid #e6e9ed; border-radius: 16px; background: #fafbfc; }
+  .ud-main table.data.responsive td { display: block; padding: 0; border: 0; min-width: 0; }
+  .ud-main table.data.responsive td::before { display: block; padding: 0 0 3px; color: #8a9099; }
+  .ud-main table.data.responsive td[data-label="Node"] { grid-column: 1 / -1; padding-bottom: 6px; }
+  .ud-main table.data.responsive td[data-label="Node"]::before { display: none; }
+  .ud-main table.data.responsive td[data-label="Trend"] { grid-column: span 2; }
+  .ud-main table.data.responsive tr:hover td { background: transparent; }
+  .ud-tabbar { display: grid; grid-template-columns: repeat(5, 1fr); align-items: center; position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 30;
+    padding: 8px 6px calc(8px + env(safe-area-inset-bottom)); border-radius: 22px; background: rgba(17,19,21,.94); border: 1px solid rgba(255,255,255,.08);
+    backdrop-filter: blur(14px); box-shadow: 0 12px 30px rgba(0,0,0,.3); }
+  .ud-tabbar a { display: flex; flex-direction: column; align-items: center; gap: 3px; color: #9aa1ab; font-size: 11px; font-weight: 600; }
+  .ud-tabbar a:hover, .ud-tabbar a:focus-visible { color: #ff7a1a; text-decoration: none; }
+  .ud-tab-add { justify-self: center; width: 54px; height: 54px; margin-top: -26px; border-radius: 50%; border: 4px solid #f2f4f6; display: grid; place-items: center;
+    background: #ff7a1a; color: #fff; cursor: pointer; box-shadow: 0 8px 22px rgba(255,122,26,.4); }
+}

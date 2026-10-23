@@ -133,3 +133,12 @@ def test_each_account_names_its_own_building(api):
     assert asha["building_name"] == "Hostel Block C"
     assert api.get("/api/telemetry", params={"owner": asha["id"]}).json()["structure_name"] == "Hostel Block C"
     assert api.get("/api/telemetry").json()["structure_name"] == site_name
+
+
+def test_every_account_has_a_short_id(api):
+    api.login(ADMIN)
+    me = api.get("/api/auth/me").json()["user"]
+    assert me["short_id"].startswith("U-") and len(me["short_id"]) == 8
+    assert api.get("/api/auth/me").json()["user"]["short_id"] == me["short_id"]  # stable
+    ids = [u["short_id"] for u in api.get("/api/users").json()["items"]]
+    assert len(ids) == len(set(ids)) and me["short_id"] in ids

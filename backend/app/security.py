@@ -61,9 +61,14 @@ def clear_session_cookie(response: Response, settings: Settings) -> None:
                            secure=settings.cookie_secure, samesite=settings.cookie_samesite)
 
 
+def short_id(user_id: str) -> str:
+    """Short, readable account ID (e.g. U-7F3A9C) derived from the internal ID, so it never changes."""
+    return "U-" + hashlib.sha256(user_id.encode()).hexdigest()[:6].upper()
+
+
 def public_user(user: dict) -> dict:
     return {
-        "id": user["id"], "email": user["email"], "name": user.get("name", ""),
+        "id": user["id"], "short_id": short_id(user["id"]), "email": user["email"], "name": user.get("name", ""),
         "role": user["role"], "active": user.get("active", True),
         "created_at": as_utc(user.get("created_at")), "last_login_at": as_utc(user.get("last_login_at")),
         "avatar": user.get("avatar"),  # None, "preset:1".."preset:4", or "upload:<version>"

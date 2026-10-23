@@ -72,6 +72,7 @@ export default function Users() {
   const { data, error, reload } = useFetch(isAdmin ? '/api/users' : '/api/auth/me')
   const [editing, setEditing] = useState(undefined)
   const [confirm, setConfirm] = useState(null)
+  const [find, setFind] = useState('')
 
   if (!isAdmin) return <><div className="page-head"><h1 data-testid="page-title">Users</h1></div><PermissionDenied what="user management" /></>
   if (error) return <div className="panel"><ErrorState error={error} onRetry={reload} testid="users-error-state" /></div>
@@ -97,13 +98,18 @@ export default function Users() {
           <button type="button" className="btn btn-primary" onClick={() => setEditing(null)} data-testid="user-add-button"><UserPlus size={14} aria-hidden="true" /> Add user</button>
         </div>
       </div>
+      <label className="field users-find">
+        <span className="sr-only">Find a user</span>
+        <input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find by ID (U-…), name, email or building" data-testid="users-search" />
+      </label>
       <section className="panel">
         {data.items.length === 0 ? <EmptyState title="No users" testid="users-empty-state" /> : (
           <table className="data responsive" data-testid="users-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Building</th><th>Nodes</th><th>Last login</th><th>Actions</th></tr></thead>
+            <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Building</th><th>Nodes</th><th>Last login</th><th>Actions</th></tr></thead>
             <tbody>
-              {data.items.map((u) => (
+              {data.items.filter((u) => !find.trim() || `${u.short_id} ${u.name} ${u.email} ${u.building_name || ''}`.toLowerCase().includes(find.trim().toLowerCase())).map((u) => (
                 <tr key={u.id} data-testid={`user-row-${slug(u.email)}`}>
+                  <td data-label="ID" className="mono" data-testid={`user-short-id-${slug(u.email)}`}>{u.short_id}</td>
                   <td data-label="Name">
                     <Link to={`/users/${u.id}`} data-testid={`user-open-${slug(u.email)}`}>{u.name}</Link>
                     {u.id === me.id ? <span className="dim small"> (you)</span> : null}

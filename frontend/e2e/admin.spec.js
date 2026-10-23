@@ -131,3 +131,23 @@ test('a user names their building and sees their alert options; the admin sees t
   await page.getByTestId(`user-building-button-${slugged}`).click()
   await expect(page.getByTestId('page-title')).toHaveText('Hostel Block C')
 })
+
+test("each user has a short ID on their dashboard, and the admin finds them by it", async ({ page, browser }) => {
+  await login(page, ADMIN)
+  const owner = await newViewer(page, 'Id Owner')
+  const ctx = await browser.newContext()
+  const user = await ctx.newPage()
+  await login(user, { email: owner.email, password: 'Viewer-pass-2026' })
+  const badge = user.getByTestId('user-short-id')
+  await expect(badge).toContainText(/U-[0-9A-F]{6}/)
+  const id = (await badge.textContent()).match(/U-[0-9A-F]{6}/)[0]
+  await ctx.close()
+
+  await page.goto('/users')
+  await page.getByTestId('users-search').fill(id.toLowerCase())
+  const slugged = owner.email.replace(/[^a-z0-9]+/g, '-')
+  await expect(page.getByTestId(`user-short-id-${slugged}`)).toHaveText(id)
+  await expect(page.locator('[data-testid^="user-short-id-"]')).toHaveCount(1) // only that user is listed
+  await page.getByTestId(`user-building-button-${slugged}`).click()
+  await expect(page.getByTestId('user-structure-id')).toHaveText(id)
+})

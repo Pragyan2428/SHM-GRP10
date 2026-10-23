@@ -31,7 +31,7 @@ export default function UserStructure() {
           <Link to="/users" className="small row" style={{ gap: 4 }} data-testid="user-structure-back"><ArrowLeft size={13} aria-hidden="true" /> Users</Link>
           <h1 data-testid="page-title">{u.building_name || `${u.name}’s building`}</h1>
           <p>
-            {u.building_name ? <>{u.name} · </> : null}<span className="mono">{u.email}</span> · <Badge value={u.role} label={u.role === 'admin' ? 'Administrator' : 'Viewer'} /> ·{' '}
+            <span className="mono" data-testid="user-structure-id">{u.short_id}</span> · {u.building_name ? <>{u.name} · </> : null}<span className="mono">{u.email}</span> · <Badge value={u.role} label={u.role === 'admin' ? 'Administrator' : 'Viewer'} /> ·{' '}
             <span data-testid="user-structure-count">{t.total_nodes} node{t.total_nodes === 1 ? '' : 's'}</span>, {t.active_nodes} online
           </p>
         </div>

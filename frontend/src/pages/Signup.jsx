@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { AlertTriangle, Eye, EyeOff, UserPlus } from 'lucide-react'
 import { useAuth } from '../lib/context'
 import { AuthBrand, homeFor } from './Login'
@@ -82,6 +82,7 @@ export default function SignupForm() {
       <button type="submit" className="btn btn-accent auth-submit" disabled={busy} data-testid="signup-submit-button">
         {busy ? <span className="spinner" aria-hidden="true" /> : <UserPlus size={15} aria-hidden="true" />} {busy ? 'Creating account…' : 'Create account'}
       </button>
+      <p className="auth-mobile-switch">Already have an account? <Link to="/login" data-testid="mobile-login-link">Log in</Link></p>
     </form>
   )
 }

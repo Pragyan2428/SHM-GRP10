@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, Building2, CheckCircle2, Gauge, Info, LayoutDashboard, Map as MapIcon, Search, Table2 } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowDownRight, ArrowUpRight, Building2, CheckCircle2, Copy, Gauge, Info, LayoutDashboard, Map as MapIcon, Plus, Search, Table2 } from 'lucide-react'
 import { BrandMark } from '../components/Layout'
 import { PARAM_ICON } from '../components/monitoring'
 import ProfileMenu, { Avatar } from '../components/ProfileMenu'
@@ -217,6 +217,12 @@ export default function UserReadings() {
         <header className="ud-head">
           <div>
             <h1 data-testid="page-title">Dashboard</h1>
+            {user?.short_id ? (
+              <button type="button" className="ud-id" title="Your account ID: give it to the admin if you need help. Click to copy."
+                onClick={() => { navigator.clipboard?.writeText(user.short_id).catch(() => {}) }} data-testid="user-short-id">
+                ID <span className="mono">{user.short_id}</span> <Copy size={12} aria-hidden="true" />
+              </button>
+            ) : null}
             <p data-testid="user-last-update">
               {data
                 ? <>Updated <span className="mono">{fmtTime(data.last_reading_at)}</span> ({fmtAgo(data.last_reading_at)}) · {data.active_nodes} of {data.total_nodes} nodes online · refreshes every 5 s</>
@@ -354,6 +360,18 @@ export default function UserReadings() {
           </>
         )}
       </main>
+      {data && data.total_nodes > 0 ? (
+        <nav className="ud-tabbar" aria-label="Sections">
+          <a href="#ud-top"><LayoutDashboard size={19} aria-hidden="true" /><span>Home</span></a>
+          <a href="#ud-trend"><Activity size={19} aria-hidden="true" /><span>Trends</span></a>
+          <button type="button" className="ud-tab-add" aria-label="Add an ESP32" data-testid="ud-tab-add" onClick={() => {
+            const el = document.getElementById('ud-add')
+            if (el) { if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+          }}><Plus size={24} aria-hidden="true" /></button>
+          <a href="#ud-nodes"><Table2 size={19} aria-hidden="true" /><span>Nodes</span></a>
+          <a href="#ud-map"><MapIcon size={19} aria-hidden="true" /><span>Map</span></a>
+        </nav>
+      ) : null}
       <Toasts />
     </div>
   )

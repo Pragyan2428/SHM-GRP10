@@ -65,14 +65,14 @@ export default function AddMyNode({ open, onConnected }) {
   )
   if (open) {
     return (
-      <section className="ud-card ud-connect" aria-labelledby="ud-add-title" data-testid="add-my-node">
+      <section className="ud-card ud-connect" id="ud-add" aria-labelledby="ud-add-title" data-testid="add-my-node">
         <div className="ud-card-head"><h2 id="ud-add-title"><Cpu size={17} aria-hidden="true" /> Add your ESP32</h2></div>
         {body}
       </section>
     )
   }
   return (
-    <details className="ud-card ud-connect" data-testid="add-my-node">
+    <details className="ud-card ud-connect" id="ud-add" data-testid="add-my-node">
       <summary><Cpu size={16} aria-hidden="true" /> Add another ESP32</summary>
       {body}
     </details>

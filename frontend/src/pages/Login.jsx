@@ -123,6 +123,8 @@ export default function LoginForm() {
         {busy ? <span className="spinner" aria-hidden="true" /> : <LogIn size={15} aria-hidden="true" />} {busy ? 'Logging in…' : 'Login'}
       </button>
       <p className="xs dim">Repeated failed attempts temporarily lock the account.</p>
+      <p className="auth-mobile-switch">New here? <Link to="/signup" data-testid="mobile-signup-link">Sign up</Link></p>
+      <p className="auth-mobile-about"><Link to="/about" data-testid="mobile-about-link">About the project <ArrowRight size={13} aria-hidden="true" /></Link></p>
     </form>
   )
 }

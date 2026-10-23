@@ -1,21 +1,28 @@
+import { lazy, Suspense } from 'react'
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Compass } from 'lucide-react'
 import Layout from './components/Layout'
 import { EmptyState, Loading } from './components/ui'
 import { AuthProvider, LiveProvider, ToastProvider, useAuth } from './lib/context'
-import About from './pages/About'
-import GoogleSheets from './pages/GoogleSheets'
-import UserStructure from './pages/UserStructure'
-import History from './pages/History'
-import LiveTelemetry from './pages/LiveTelemetry'
 import AuthPage from './pages/Auth'
-import { NodeDetailPage, NodesPage } from './pages/Nodes'
-import Notifications from './pages/Notifications'
-import Overview from './pages/Overview'
-import System from './pages/System'
-import Thresholds from './pages/Thresholds'
-import UserReadings from './pages/UserReadings'
-import Users from './pages/Users'
+
+// Every page except Login/Sign up is downloaded only when it is opened, so the login page
+// stays small and the chart library loads only on pages with charts.
+const About = lazy(() => import('./pages/About'))
+const GoogleSheets = lazy(() => import('./pages/GoogleSheets'))
+const UserStructure = lazy(() => import('./pages/UserStructure'))
+const History = lazy(() => import('./pages/History'))
+const LiveTelemetry = lazy(() => import('./pages/LiveTelemetry'))
+const NodesPage = lazy(() => import('./pages/Nodes').then((m) => ({ default: m.NodesPage })))
+const NodeDetailPage = lazy(() => import('./pages/Nodes').then((m) => ({ default: m.NodeDetailPage })))
+const Notifications = lazy(() => import('./pages/Notifications'))
+const Overview = lazy(() => import('./pages/Overview'))
+const System = lazy(() => import('./pages/System'))
+const Thresholds = lazy(() => import('./pages/Thresholds'))
+const UserReadings = lazy(() => import('./pages/UserReadings'))
+const Users = lazy(() => import('./pages/Users'))
+
+const pageLoading = <Loading label="Loading…" testid="page-loading-state" />
 
 function useSession() {
   const { user, loading } = useAuth()
@@ -39,7 +46,7 @@ function Protected() {
 
 function UserOnly() {
   const { gate } = useSession()
-  return gate || <UserReadings />
+  return gate || <Suspense fallback={pageLoading}><UserReadings /></Suspense>
 }
 
 function NotFound() {
@@ -62,7 +69,7 @@ export default function App() {
             <Route path="/login" element={null} />
             <Route path="/signup" element={null} />
           </Route>
-          <Route path="/about" element={<About />} />
+          <Route path="/about" element={<Suspense fallback={pageLoading}><About /></Suspense>} />
           <Route path="/user" element={<UserOnly />} />
           <Route element={<Protected />}>
             <Route index element={<Overview />} />

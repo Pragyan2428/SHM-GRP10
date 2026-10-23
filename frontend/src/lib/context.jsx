@@ -82,6 +82,7 @@ export const useAuth = () => useContext(AuthCtx)
 /* -------------------------------------------------------------- live data */
 const LiveCtx = createContext(null)
 const POLL_MS = 5000
+export const HIDDEN_POLL_MS = 30000 // background tabs poll this often
 
 function notifyBrowser(alert) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return
@@ -107,9 +108,11 @@ export function LiveProvider({ children }) {
   const seen = useRef(null)
   const inflight = useRef(false)
 
+  const lastPoll = useRef(0)
   const refresh = useCallback(async () => {
     if (inflight.current) return
     inflight.current = true
+    lastPoll.current = Date.now()
     try {
       const [t, ev] = await Promise.all([
         api('/api/telemetry'),
@@ -146,8 +149,13 @@ export function LiveProvider({ children }) {
 
   useEffect(() => {
     refresh()
-    const id = setInterval(refresh, POLL_MS)
-    return () => clearInterval(id)
+    const id = setInterval(() => {
+      // in a background tab check every 30 s instead of 5 s (still enough for desktop alerts)
+      if (!document.hidden || Date.now() - lastPoll.current >= HIDDEN_POLL_MS) refresh()
+    }, POLL_MS)
+    const back = () => { if (!document.hidden) refresh() }
+    document.addEventListener('visibilitychange', back)
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', back) }
   }, [refresh])
 
   useEffect(() => {

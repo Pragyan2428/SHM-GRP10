@@ -13,7 +13,7 @@ import MyAlerts from '../components/MyAlerts'
 import { IsoBuilding, floorName, placeNodes } from '../components/twin'
 import { Banner, EmptyState, Loading } from '../components/ui'
 import { api } from '../lib/api'
-import { useAuth } from '../lib/context'
+import { HIDDEN_POLL_MS, useAuth } from '../lib/context'
 import { PARAMS, PARAM_SHORT, SENSOR, UNITS, fmtAgo, fmtNum, fmtTime, fmtValue } from '../lib/format'
 import { MiniLine, useRollingHistory } from './LiveTelemetry'
 
@@ -131,10 +131,15 @@ export default function UserReadings() {
   }, [])
 
   useEffect(() => {
+    let last = Date.now()
+    const tick = () => { last = Date.now(); load() }
     load()
-    const poll = setInterval(load, POLL_MS)
-    const clock = setInterval(() => setTick((t) => t + 1), 1000) // keeps "x s ago" current
-    return () => { clearInterval(poll); clearInterval(clock) }
+    // background tab: every 30 s instead of 5 s; back in view: right away
+    const poll = setInterval(() => { if (!document.hidden || Date.now() - last >= HIDDEN_POLL_MS) tick() }, POLL_MS)
+    const clock = setInterval(() => { if (!document.hidden) setTick((t) => t + 1) }, 1000) // keeps "x s ago" current
+    const back = () => { if (!document.hidden) tick() }
+    document.addEventListener('visibilitychange', back)
+    return () => { clearInterval(poll); clearInterval(clock); document.removeEventListener('visibilitychange', back) }
   }, [load])
 
   const nodes = useMemo(() => [...(data?.nodes || [])].sort((a, b) => (b.online - a.online) || a.node_id.localeCompare(b.node_id)), [data])

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Suspense } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   Activity, Bell, BellRing, Cpu, FileSpreadsheet, Gauge, History, Info, LayoutDashboard, Lock, Menu, Radio,
@@ -7,7 +8,7 @@ import {
 import { useAuth, useLive } from '../lib/context'
 import { fmtAgo, fmtTime, fmtValue } from '../lib/format'
 import ProfileMenu from './ProfileMenu'
-import { Badge, Banner, SeverityBadge, Toasts } from './ui'
+import { Badge, Banner, Loading, SeverityBadge, Toasts } from './ui'
 
 // Shortcuts in the admin's profile card.
 const ADMIN_LINKS = [
@@ -200,7 +201,7 @@ export default function Layout() {
             <span className="spacer" />
             <span className="nowrap" data-testid="mobile-current-user">{user.name || user.email} · {user.role}</span>
           </div>
-          <Outlet />
+          <Suspense fallback={<Loading label="Loading…" testid="page-loading-state" />}><Outlet /></Suspense>
         </main>
       </div>
       <Toasts />

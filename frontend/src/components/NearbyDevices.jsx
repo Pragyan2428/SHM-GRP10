@@ -134,7 +134,7 @@ export default function NearbyDevices({ selectedMac, onPick }) {
       .then((d) => { if (alive) { setData(d); setError('') } })
       .catch((e) => { if (alive) setError(e.message) })
     load()
-    const id = setInterval(load, POLL_MS)
+    const id = setInterval(() => { if (!document.hidden) load() }, POLL_MS) // no scanning in a background tab
     return () => { alive = false; clearInterval(id) }
   }, [scope])
 

@@ -52,6 +52,7 @@ function UserOnly() {
 function NotFound() {
   return (
     <div className="panel">
+      <div className="nf-photo" aria-hidden="true"><img src="/images/notfound-crack.webp" alt="" /><span>This page has a crack in it.</span></div>
       <EmptyState icon={Compass} title="Page not found" message="That page does not exist." testid="not-found-state">
         <Link to="/" className="btn btn-sm" data-testid="not-found-home-link">Back to overview</Link>
       </EmptyState>

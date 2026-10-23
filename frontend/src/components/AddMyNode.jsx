@@ -66,9 +66,12 @@ export default function AddMyNode({ open, onConnected }) {
   )
   if (open) {
     return (
-      <section className="ud-card ud-connect" id="ud-add" aria-labelledby="ud-add-title" data-testid="add-my-node">
-        <div className="ud-card-head"><h2 id="ud-add-title"><Cpu size={17} aria-hidden="true" /> Add your ESP32</h2></div>
-        {body}
+      <section className="ud-card ud-connect ud-connect-hero" id="ud-add" aria-labelledby="ud-add-title" data-testid="add-my-node">
+        <div className="ud-connect-photo" aria-hidden="true"><img src="/images/user-esp32-hand.webp" alt="" /><span>Small enough for your palm, it watches a whole column.</span></div>
+        <div className="ud-connect-main">
+          <div className="ud-card-head"><h2 id="ud-add-title"><Cpu size={17} aria-hidden="true" /> Add your ESP32</h2></div>
+          {body}
+        </div>
       </section>
     )
   }

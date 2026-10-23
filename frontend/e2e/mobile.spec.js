@@ -101,3 +101,10 @@ test('the About page opens the 3D sensor node full screen and takes it apart', a
   await page.keyboard.press('Escape')
   await expect(viewer).toHaveCount(0)
 })
+
+test('the About timeline, who-it-serves and thank-you sections show their photos', async ({ page }) => {
+  await page.goto('/about')
+  await expect(page.getByTestId('about-timeline-photos').locator('img')).toHaveCount(2)
+  await expect(page.getByTestId('about-serve-photos').locator('img')).toHaveCount(3)
+  await expect(page.getByTestId('about-cta')).toHaveClass(/about-cta-photo/)
+})

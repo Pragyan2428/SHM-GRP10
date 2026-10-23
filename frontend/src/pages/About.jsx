@@ -73,7 +73,7 @@ const TIMELINE = [
   { month: 'Month 4', text: 'Performance testing, final validation and MVP release (Week 16)' },
 ]
 
-// Photo rows inside the sections: [file, caption title, caption text, alt]
+// Photo rows inside the sections: [file, caption title, caption text, alt, crop position]
 const HARDWARE_PHOTOS = [
   ['hw-esp32', 'ESP32 dev board', 'The brain of every node: reads the sensors and sends over Wi-Fi.', 'An ESP32 development board on a dark desk'],
   ['hw-adxl', '3-axis accelerometer module', 'Feels the vibration of a beam or column, the job the ADXL345 does in our node.', 'A small blue accelerometer breakout board next to header pins'],
@@ -81,6 +81,10 @@ const HARDWARE_PHOTOS = [
 const WHY_PHOTOS = [
   ['why-arch', 'Old structures age quietly', 'Brick and stone keep weathering long after anyone last checked them.', 'An old brick arch bridge over a dry stream'],
   ['why-netting', 'Inspection is slow and manual', 'Engineers still walk every span; our nodes watch it all the time.', 'A man walking on safety netting under a steel bridge deck'],
+]
+const TIMELINE_PHOTOS = [
+  ['timeline-solder', 'Phase 1 · build it', 'Soldering the sensors to the ESP32 and writing the first firmware.', 'Hands soldering a small green circuit board next to a laptop', 'center 72%'],
+  ['timeline-bench', 'Phase 2 · make it last', 'Custom PCB, power tuning and testing many nodes together.', 'An electronics workbench with circuit boards and precision tools'],
 ]
 const SERVE_PHOTOS = [
   ['serve-flyover', 'Flyovers & interchanges', 'Heavy daily traffic, constant vibration.', 'Aerial view of a multi-level highway interchange'],
@@ -91,9 +95,9 @@ const SERVE_PHOTOS = [
 function PhotoRow({ items, testid }) {
   return (
     <div className={`about-photos n${items.length}`} data-testid={testid}>
-      {items.map(([file, title, text, alt]) => (
+      {items.map(([file, title, text, alt, pos]) => (
         <figure key={file} className="about-photo">
-          <img src={`/images/${file}.webp`} alt={alt} loading="lazy" decoding="async" />
+          <img src={`/images/${file}.webp`} alt={alt} loading="lazy" decoding="async" style={pos ? { objectPosition: pos } : undefined} />
           <figcaption><strong>{title}</strong><span>{text}</span></figcaption>
         </figure>
       ))}
@@ -315,6 +319,7 @@ export default function About() {
               </li>
             ))}
           </ol>
+          <PhotoRow items={TIMELINE_PHOTOS} testid="about-timeline-photos" />
           <div className="grid grid-2">
             <div className="about-card"><h3>Phase 1 · Proof of concept</h3><p>Months 1–2: circuit design, firmware, cloud integration and the PoC demo at Week 8.</p></div>
             <div className="about-card"><h3>Phase 2 · Minimum viable product</h3><p>Months 3–4: PCB fabrication, power optimisation, multi-node testing and the MVP release at Week 16.</p></div>
@@ -340,7 +345,7 @@ export default function About() {
           <Cards items={IN_THIS_APP} testid="about-prototype-cards" />
         </Section>
 
-        <section className="about-cta panel" data-testid="about-cta">
+        <section className="about-cta about-cta-photo panel" data-testid="about-cta">
           <MessageCircle size={18} className="about-icon" aria-hidden="true" />
           <p>Thank you for your time. Questions and suggestions are welcome.</p>
           <span className="spacer" />

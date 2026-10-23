@@ -1194,3 +1194,35 @@ input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
 .auth-card.login .auth-overlay:hover::before, .auth-card.signup .auth-overlay:hover::after { transform: scale(1.06); }
 .auth-overlay-inner { position: relative; z-index: 1; }
 @media (prefers-reduced-motion: reduce) { .auth-overlay::before, .auth-overlay::after { transition: opacity .2s; transform: none !important; } }
+
+/* About: the closing thank-you box sits on a night skyline */
+.about-cta-photo { position: relative; overflow: hidden; min-height: 200px; padding: 32px; border-radius: 24px; isolation: isolate; }
+.about-cta-photo::before { content: ""; position: absolute; inset: 0; z-index: -2; background: url('/images/thanks-city.webp') center 40% / cover no-repeat; transition: transform .9s cubic-bezier(.22, 1, .36, 1); }
+.about-cta-photo::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(5,5,6,.9), rgba(5,5,6,.55) 55%, rgba(5,5,6,.35)); }
+.about-cta-photo:hover::before { transform: scale(1.05); }
+.about-cta-photo p { color: #fff; font-size: 16px; font-weight: 600; }
+
+/* user page: the first "Add your ESP32" card has a photo beside it */
+.ud-connect-hero { display: grid; grid-template-columns: minmax(0, 280px) minmax(0, 1fr); gap: 20px; align-items: stretch; }
+.ud-connect-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.ud-connect-photo { position: relative; margin: -8px 0 -8px -8px; border-radius: 16px; overflow: hidden; min-height: 260px; }
+.ud-connect-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 40%; transition: transform .7s cubic-bezier(.22, 1, .36, 1); }
+.ud-connect-photo:hover img { transform: scale(1.06); }
+.ud-connect-photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(17,19,21,.85), transparent 55%); }
+.ud-connect-photo span { position: absolute; left: 14px; right: 14px; bottom: 14px; z-index: 1; color: #fff; font-size: 13px; font-weight: 600; line-height: 1.4; }
+.ud-connect-hero .ud-steps { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+@media (min-width: 1280px) { .ud-connect-hero .ud-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 900px) {
+  .ud-connect-hero { grid-template-columns: minmax(0, 1fr); }
+  .ud-connect-photo { margin: -4px -4px 0; min-height: 170px; }
+  .ud-connect-photo img { object-position: center 45%; }
+}
+
+/* page not found: a cracked column under the message */
+.nf-photo { position: relative; height: clamp(220px, 40vh, 380px); border-radius: 20px; overflow: hidden; border: 1px solid var(--line); }
+.nf-photo img { width: 100%; height: 100%; object-fit: cover; object-position: center 55%; display: block; transition: transform .7s cubic-bezier(.22, 1, .36, 1); }
+.nf-photo:hover img { transform: scale(1.05); }
+.nf-photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, rgba(5,5,6,.75), transparent 50%); }
+.nf-photo span { position: absolute; left: 18px; bottom: 16px; z-index: 1; color: #fff; font-weight: 700; font-size: 15px; }
+@media (prefers-reduced-motion: reduce) { .about-cta-photo::before, .ud-connect-photo img, .nf-photo img { transition: none; transform: none !important; } }
+.panel > .nf-photo { margin: 14px 14px 0; }

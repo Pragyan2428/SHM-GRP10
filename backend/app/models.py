@@ -95,6 +95,11 @@ class BuildingName(BaseModel):
     building_name: str = Field(min_length=1, max_length=80)
 
 
+class BuildingPhoto(BaseModel):
+    """A photo of the account's building as a data URL (the web app shrinks it to 1280 px first)."""
+    image: str = Field(min_length=1, max_length=1_500_000)
+
+
 class ProfileUpdate(BaseModel):
     """Changes a signed-in user may make to their own account."""
     name: str = Field(min_length=1, max_length=80)

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import ExplodedNode from '../components/ExplodedNode'
 import { BrandMark } from '../components/Layout'
+import ScrollTop from '../components/ScrollTop'
 import { useAuth } from '../lib/context'
 
 // three.js is only downloaded when the About page is opened.
@@ -310,6 +311,7 @@ export default function About() {
             : <Link to="/login" className="btn btn-primary">Login to the dashboard</Link>}
         </section>
       </main>
+      <ScrollTop />
     </div>
   )
 }

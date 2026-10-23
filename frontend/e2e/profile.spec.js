@@ -184,3 +184,24 @@ test('a new user connects their own ESP32 from their page, with no keys or comma
   await expect(page.getByTestId('ud-map').getByTestId(`map-pin-${id.toLowerCase()}`)).toHaveAttribute('data-floor', '2')
   await expect(page.getByTestId('add-my-node')).toContainText('Add another ESP32')
 })
+
+test('a user puts a photo of their building in the map card, switches views and removes it', async ({ page, request }) => {
+  await newUser(page, 'Photo Building')
+  await ingest(request, uniqueNode(), { strain: 300 }, await myDeviceKey(page))
+  const card = page.getByTestId('ud-map')
+  await expect(card.locator('svg').first()).toBeVisible() // the drawing until a photo is added
+  await card.getByTestId('building-photo-input').setInputFiles({ name: 'house.png', mimeType: 'image/png', buffer: await photo(page) })
+  const img = card.getByTestId('ud-building-photo')
+  await expect(img).toBeVisible()
+  await expect.poll(() => img.evaluate((el) => el.complete && el.naturalWidth)).toBe(300)
+  await page.screenshot({ path: '.shots/building-photo.png' })
+  await card.getByTestId('ud-map-view-plan').click()
+  await expect(img).toHaveCount(0)
+  await expect(card.getByTestId('ud-floor-select')).toBeVisible()
+  await card.getByTestId('ud-map-view-photo').click()
+  await page.reload()
+  await expect(card.getByTestId('ud-building-photo')).toBeVisible() // saved
+  await card.getByTestId('building-photo-remove').click()
+  await expect(card.getByTestId('ud-building-photo')).toHaveCount(0)
+  await expect(card.getByTestId('building-photo-upload')).toHaveText(/Add a photo/)
+})

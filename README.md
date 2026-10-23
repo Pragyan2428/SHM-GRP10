@@ -201,10 +201,10 @@ Every request must carry the secret, so the URL alone is not enough to write to 
 ## Tests
 
 ```bash
-cd backend && python -m pytest        # 155 API tests, in-memory MongoDB
+cd backend && python -m pytest        # 156 API tests, in-memory MongoDB
 ```
 
-End-to-end (Playwright, 57 tests in `frontend/e2e`):
+End-to-end (Playwright, 60 tests in `frontend/e2e`):
 
 ```bash
 cd frontend

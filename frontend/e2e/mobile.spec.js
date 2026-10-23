@@ -67,3 +67,23 @@ test('readings page fits 390px as a user', async ({ page, request }) => {
   await page.getByTestId('ud-tab-add').click()
   await expect(page.getByTestId('add-my-node')).toHaveAttribute('open', '')
 })
+
+test('a back-to-top button appears after scrolling and takes you up', async ({ page }) => {
+  await page.goto('/about')
+  await expect(page.getByTestId('about-cta')).toBeAttached() // the whole page has loaded
+  const btn = page.getByTestId('scroll-top')
+  await expect(btn).not.toHaveClass(/show/)
+  await page.evaluate(() => window.scrollTo(0, (document.documentElement.scrollHeight - window.innerHeight) * 0.3))
+  await expect(btn).toHaveClass(/show/)
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: '.shots/scroll-top.png' })
+  await btn.click()
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(5)
+  await expect(btn).not.toHaveClass(/show/)
+})
+
+test('the back-to-top button is only on the About page', async ({ page }) => {
+  await page.goto('/login')
+  await expect(page.getByTestId('login-page')).toBeVisible()
+  await expect(page.getByTestId('scroll-top')).toHaveCount(0)
+})

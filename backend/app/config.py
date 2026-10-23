@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     # Self-service sign-up on the login page (creates viewer accounts only)
     allow_signup: bool = Field(default=True, alias="ALLOW_SIGNUP")
     signup_email_domain: str = Field(default="gmail.com", alias="SIGNUP_EMAIL_DOMAIN")  # e.g. name@gmail.com
+    signups_per_ip_per_hour: int = Field(default=10, ge=1, alias="SIGNUPS_PER_IP_PER_HOUR")
 
     # Login protection
     login_max_attempts: int = Field(default=5, alias="LOGIN_MAX_ATTEMPTS")

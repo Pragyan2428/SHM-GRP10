@@ -9,6 +9,7 @@ import { BrandMark } from '../components/Layout'
 import { PARAM_ICON } from '../components/monitoring'
 import ProfileMenu, { Avatar } from '../components/ProfileMenu'
 import AddMyNode from '../components/AddMyNode'
+import { BuildingPhotoActions, buildingPhotoUrl } from '../components/BuildingPhoto'
 import MyAlerts from '../components/MyAlerts'
 import { IsoBuilding, floorName, placeNodes } from '../components/twin'
 import { Banner, EmptyState, Loading, Toasts } from '../components/ui'
@@ -118,6 +119,7 @@ export default function UserReadings() {
   const [selected, setSelected] = useState(null)
   const [floor, setFloor] = useState(null)
   const [naming, setNaming] = useState(null) // building name being edited
+  const [mapView, setMapView] = useState('photo') // 'photo' (when there is one) or 'plan'
   const [, setTick] = useState(0)
   const history = useRollingHistory(data)
 
@@ -164,6 +166,9 @@ export default function UserReadings() {
   const p = data?.parameters.find((x) => x.parameter === param)
   const loadOf = (n) => Math.max(0, ...(data?.parameters || []).map((x) => (n.latest?.[x.parameter]?.value || 0) / x.safe_threshold))
   const focus = byId.find((n) => n.node_id === selected) || [...byId].filter((n) => n.online).sort((a, b) => loadOf(b) - loadOf(a))[0]
+  const photo = data?.building_photo
+  const showPhoto = !!photo && mapView === 'photo'
+  const setPhoto = (v) => { setData((d) => ({ ...d, building_photo: v })); if (v) setMapView('photo') }
 
   return (
     <div className="ud" data-testid="user-page">
@@ -335,13 +340,20 @@ export default function UserReadings() {
 
               <article className="ud-card ud-map" id="ud-map" aria-labelledby="ud-map-title" data-testid="ud-map">
                 <div className="ud-card-head">
-                  <h2 id="ud-map-title">Building map</h2>
-                  <select value={floor ?? ''} onChange={(e) => setFloor(e.target.value === '' ? null : e.target.value === 'roof' ? 'roof' : Number(e.target.value))}
+                  <h2 id="ud-map-title">{showPhoto ? 'Your building' : 'Building map'}</h2>
+                  {photo ? (
+                    <div className="ud-seg ud-seg-dark" role="tablist" aria-label="Show">
+                      <button type="button" role="tab" aria-selected={showPhoto} onClick={() => setMapView('photo')} data-testid="ud-map-view-photo">Photo</button>
+                      <button type="button" role="tab" aria-selected={!showPhoto} onClick={() => setMapView('plan')} data-testid="ud-map-view-plan">Map</button>
+                    </div>
+                  ) : null}
+                  {showPhoto ? null : <select value={floor ?? ''} onChange={(e) => setFloor(e.target.value === '' ? null : e.target.value === 'roof' ? 'roof' : Number(e.target.value))}
                     className="ud-select dark" aria-label="Floor" data-testid="ud-floor-select">
                     <option value="">All floors</option>
                     {view.layout.floors.map((f) => <option key={f} value={f}>{floorName(f)}</option>)}
-                  </select>
+                  </select>}
                 </div>
+                {showPhoto ? <img className="ud-photo" src={buildingPhotoUrl(photo)} alt="Photo of your building" data-testid="ud-building-photo" /> : null}
                 {focus ? (
                   <div className="ud-map-bubble" data-testid="ud-map-bubble">
                     <strong className="mono">{focus.node_id}</strong>
@@ -349,9 +361,27 @@ export default function UserReadings() {
                     <span className="ud-map-loc">{focus.location}</span>
                   </div>
                 ) : null}
-                <div className="ud-map-art">
-                  <IsoBuilding nodes={byId} params={data.parameters} view={view} selectedId={focus?.node_id} floor={floor} onSelect={setSelected} />
-                </div>
+                {showPhoto ? (
+                  <ul className="ud-photo-nodes" aria-label="Your nodes">
+                    {byId.slice(0, 6).map((n) => {
+                      const st = n.online ? n.condition : 'muted'
+                      return (
+                        <li key={n.node_id}>
+                          <button type="button" onClick={() => setSelected(n.node_id)} aria-pressed={focus?.node_id === n.node_id}>
+                            <span className="ud-photo-dot" style={{ background: STATUS_COLOR[st] || STATUS_COLOR.nominal }} aria-hidden="true" />
+                            <span className="mono">{n.node_id}</span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                    {byId.length > 6 ? <li className="ud-photo-more">+{byId.length - 6}</li> : null}
+                  </ul>
+                ) : (
+                  <div className="ud-map-art">
+                    <IsoBuilding nodes={byId} params={data.parameters} view={view} selectedId={focus?.node_id} floor={floor} onSelect={setSelected} />
+                  </div>
+                )}
+                <BuildingPhotoActions version={photo} onChange={setPhoto} />
               </article>
             </section>
 

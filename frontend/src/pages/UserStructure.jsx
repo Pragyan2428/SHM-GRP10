@@ -3,6 +3,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { FloorPlans } from '../components/FloorPlan'
+import { buildingPhotoUrl } from '../components/BuildingPhoto'
 import { DigitalTwin } from '../components/twin'
 import { Badge, EmptyState, ErrorState, Loading, PermissionDenied } from '../components/ui'
 import { useAuth, useFetch, useLive } from '../lib/context'
@@ -36,6 +37,13 @@ export default function UserStructure() {
           </p>
         </div>
       </div>
+
+      {t.building_photo ? (
+        <section className="panel" aria-labelledby="us-photo">
+          <div className="panel-head"><h2 id="us-photo">Photo of the building</h2></div>
+          <div className="panel-body"><img className="us-photo" src={buildingPhotoUrl(t.building_photo, userId)} alt={`Photo of ${u.name}’s building`} data-testid="user-structure-photo" /></div>
+        </section>
+      ) : null}
 
       {t.total_nodes === 0 ? (
         <div className="panel">

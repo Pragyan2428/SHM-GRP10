@@ -6,25 +6,45 @@ import binascii
 import re
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from datetime import timedelta
 
 from ..config import get_settings
 from ..db import as_utc, audit, get_db, utcnow
-from ..models import AlertPrefs, AvatarUpdate, BuildingName, PasswordChange, ProfileUpdate
+from ..models import AlertPrefs, AvatarUpdate, BuildingName, BuildingPhoto, PasswordChange, ProfileUpdate
 from ..services import notifications
 from ..security import current_user, hash_password, public_user, verify_password
 
 router = APIRouter(prefix="/api/profile", tags=["profile"])
 
 MAX_AVATAR_BYTES = 300_000  # the web app resizes photos to 256x256 before upload (~20-60 KB)
+MAX_BUILDING_PHOTO_BYTES = 1_000_000  # building photos are shrunk to 1280 px (~100-300 KB)
 DATA_URL = re.compile(r"^data:(image/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=\s]+)$")
 MAGIC = {
     "image/png": lambda b: b.startswith(b"\x89PNG\r\n\x1a\n"),
     "image/jpeg": lambda b: b.startswith(b"\xff\xd8\xff"),
     "image/webp": lambda b: b[:4] == b"RIFF" and b[8:12] == b"WEBP",
 }
+
+
+def _decode_image(image: str, max_bytes: int) -> tuple[str, bytes]:
+    """Check a data-URL upload: PNG, JPEG or WebP, really that format, and not too big."""
+    m = DATA_URL.match(image.strip())
+    if not m:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Upload a PNG, JPEG or WebP image")
+    content_type = m.group(1)
+    try:
+        data = base64.b64decode(re.sub(r"\s", "", m.group(2)), validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The image could not be read")
+    if len(data) > max_bytes:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, f"Image is too large (max {max_bytes // 1000} KB)")
+    if not MAGIC[content_type](data):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The file is not a valid image")
+    return content_type, data
 
 
 async def _save_user(user_id: str, changes: dict) -> dict:
@@ -66,18 +86,7 @@ async def set_avatar(body: AvatarUpdate, user: dict = Depends(current_user)):
         await audit(user, "avatar_changed", user["email"], {"preset": body.preset})
         return {"user": public_user(saved)}
 
-    m = DATA_URL.match(body.image.strip())
-    if not m:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Upload a PNG, JPEG or WebP image")
-    content_type = m.group(1)
-    try:
-        data = base64.b64decode(re.sub(r"\s", "", m.group(2)), validate=True)
-    except (binascii.Error, ValueError):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The image could not be read")
-    if len(data) > MAX_AVATAR_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Image is too large (max 300 KB)")
-    if not MAGIC[content_type](data):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The file is not a valid image")
+    content_type, data = _decode_image(body.image, MAX_AVATAR_BYTES)
     version = int(utcnow().timestamp() * 1000)
     await db.user_avatars.update_one(
         {"user_id": user["id"]},
@@ -215,3 +224,42 @@ async def set_building_name(body: BuildingName, user: dict = Depends(current_use
         raise HTTPException(422, "Enter a building name")
     await get_db().users.update_one({"id": user["id"]}, {"$set": {"building_name": name}})
     return {"building_name": name}
+
+
+# ---- a photo of the account's building, shown in the Building map card ----------------------
+@router.put("/building/photo")
+async def set_building_photo(body: BuildingPhoto, user: dict = Depends(current_user)):
+    content_type, data = _decode_image(body.image, MAX_BUILDING_PHOTO_BYTES)
+    db = get_db()
+    await db.building_photos.update_one(
+        {"user_id": user["id"]},
+        {"$set": {"user_id": user["id"], "content_type": content_type, "data": data, "updated_at": utcnow()}},
+        upsert=True)
+    version = int(utcnow().timestamp() * 1000)
+    await db.users.update_one({"id": user["id"]}, {"$set": {"building_photo": version}})
+    await audit(user, "building_photo_changed", user["email"], {"upload_bytes": len(data)})
+    return {"building_photo": version}
+
+
+@router.delete("/building/photo")
+async def remove_building_photo(user: dict = Depends(current_user)):
+    db = get_db()
+    await db.building_photos.delete_one({"user_id": user["id"]})
+    await db.users.update_one({"id": user["id"]}, {"$unset": {"building_photo": ""}})
+    await audit(user, "building_photo_removed", user["email"])
+    return {"building_photo": None}
+
+
+@router.get("/building/photo")
+async def get_building_photo(user: dict = Depends(current_user),
+                             user_id: Optional[str] = Query(None, max_length=64, description="admins: another account's photo")):
+    who = user["id"]
+    if user_id and user_id != user["id"]:
+        if user.get("role") != "admin":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Only administrators can see other buildings")
+        who = user_id
+    doc = await get_db().building_photos.find_one({"user_id": who}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No building photo")
+    return Response(content=bytes(doc["data"]), media_type=doc["content_type"],
+                    headers={"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff"})

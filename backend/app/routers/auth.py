@@ -12,7 +12,7 @@ from ..security import (CSRF_HEADER, check_lockout, clear_failures, clear_sessio
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-SIGNUPS_PER_IP_PER_HOUR = 10
+SIGNUPS_PER_IP_PER_HOUR = 10  # default; set SIGNUPS_PER_IP_PER_HOUR to change it
 
 
 def _client_ip(request: Request) -> str:
@@ -66,7 +66,7 @@ async def signup(body: SignupRequest, request: Request, response: Response,
     now = utcnow()
     doc = await attempts.find_one({"key": f"signup:{ip}"}) or {}
     recent = [as_utc(t) for t in doc.get("signups", []) if as_utc(t) > now - timedelta(hours=1)]
-    if len(recent) >= SIGNUPS_PER_IP_PER_HOUR:
+    if len(recent) >= settings.signups_per_ip_per_hour:
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many new accounts from this network. Try again later.",
                             headers={"Retry-After": "3600"})
 

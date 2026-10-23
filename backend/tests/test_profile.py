@@ -99,3 +99,28 @@ def test_pictures_are_private_to_each_user(api):
     api.post("/api/auth/logout")
     api.login(ADMIN)
     assert api.get("/api/profile/avatar").status_code == 404  # the admin sees only their own picture
+
+
+def test_building_photo_upload_view_and_remove(api):
+    api.login(VIEWER)
+    me = api.get("/api/auth/me").json()["user"]["id"]
+    assert api.get("/api/telemetry").json()["building_photo"] is None
+    assert api.put("/api/profile/building/photo", json={"image": data_url("png", b"<svg/>")}).status_code == 400
+    r = api.put("/api/profile/building/photo", json={"image": data_url("jpeg", JPEG)})
+    assert r.status_code == 200 and r.json()["building_photo"]
+    assert api.get("/api/telemetry").json()["building_photo"] == r.json()["building_photo"]
+    img = api.get("/api/profile/building/photo")
+    assert img.status_code == 200 and img.content == JPEG and img.headers["content-type"] == "image/jpeg"
+    # another viewer cannot look at it; an administrator can
+    api.post("/api/auth/logout")
+    api.post("/api/auth/signup", json={"name": "Other", "email": "other.viewer@gmail.com", "password": "Other-Password-1"})
+    assert api.get("/api/profile/building/photo", params={"user_id": me}).status_code == 403
+    api.post("/api/auth/logout")
+    api.login(ADMIN)
+    assert api.get("/api/profile/building/photo", params={"user_id": me}).content == JPEG
+    assert api.get("/api/telemetry", params={"owner": me}).json()["building_photo"]
+    api.post("/api/auth/logout")
+    api.login(VIEWER)
+    assert api.delete("/api/profile/building/photo").json() == {"building_photo": None}
+    assert api.get("/api/profile/building/photo").status_code == 404
+    assert api.get("/api/telemetry").json()["building_photo"] is None

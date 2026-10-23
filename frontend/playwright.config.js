@@ -13,6 +13,7 @@ const apiEnv = {
   FRONTEND_URL: `http://localhost:${WEB_PORT}`,
   SIMULATOR_ENABLED: 'false',
   LOGIN_MAX_ATTEMPTS: '1000',
+  SIGNUPS_PER_IP_PER_HOUR: '1000', // the suite makes many accounts from one machine
   ALLOW_SIGNUP: 'true',
   // Never send real email / SMS / WhatsApp from tests, even if backend/.env has credentials.
   EMAIL_PROVIDER: '',

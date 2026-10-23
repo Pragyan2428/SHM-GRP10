@@ -197,8 +197,20 @@ export default function About() {
           <Cards items={PROBLEMS} testid="about-problem-cards" />
         </Section>
 
+        <figure className="about-banner" data-testid="about-banner">
+          <img src="/images/about-city.webp" alt="Aerial render of a glass-and-brick building among white city blocks" loading="lazy" decoding="async" width="736" height="1308" />
+          <figcaption>
+            <span className="about-eyebrow">Built for real buildings</span>
+            <strong>Every floor, every column, watched in real time.</strong>
+            <span>Small ESP32 nodes on beams and columns send strain, vibration and temperature to one dashboard.</span>
+          </figcaption>
+        </figure>
+
         <Section id="solution" eyebrow="Proposed solution" title="What the Smart SHM system does">
-          <Cards items={SOLUTION} testid="about-solution-cards" />
+          <div className="about-split">
+            <img className="about-split-img" src="/images/about-concrete.webp" alt="Concrete floors cantilevered over a column" loading="lazy" decoding="async" width="736" height="1309" />
+            <Cards items={SOLUTION} testid="about-solution-cards" />
+          </div>
         </Section>
 
         <Section id="hardware" eyebrow="Hardware architecture" title="From sensor to dashboard">

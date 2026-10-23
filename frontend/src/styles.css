@@ -1076,3 +1076,21 @@ input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
   .ud-steps li { padding: 12px; }
   .ud-tabbar.short { grid-template-columns: repeat(3, 1fr); left: 40px; right: 40px; }
 }
+
+/* About: photo banner and picture beside the solution cards */
+.about-banner { position: relative; margin: 0; height: clamp(260px, 38vw, 420px); border-radius: 24px; overflow: hidden; border: 1px solid var(--line); }
+.about-banner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 46%; }
+.about-banner::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(8,9,11,.92) 0%, rgba(8,9,11,.7) 38%, rgba(8,9,11,0) 72%); }
+.about-banner figcaption { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 10px; max-width: 460px; padding: 32px; color: var(--text-2); font-size: 14.5px; line-height: 1.55; }
+.about-banner figcaption strong { font-family: var(--font-head); font-size: clamp(22px, 3vw, 32px); line-height: 1.15; letter-spacing: -.03em; color: #fff; }
+.about-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; align-items: stretch; }
+.about-split-img { width: 100%; height: 0; min-height: 100%; object-fit: cover; object-position: center 30%; border-radius: 20px; border: 1px solid var(--line); filter: grayscale(.2); }
+.about-split .about-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 760px) {
+  .about-banner { height: 420px; }
+  .about-banner::after { background: linear-gradient(0deg, rgba(8,9,11,.95) 0%, rgba(8,9,11,.75) 45%, rgba(8,9,11,.1) 80%); }
+  .about-banner figcaption { justify-content: flex-end; padding: 22px; }
+  .about-split { grid-template-columns: minmax(0, 1fr); }
+  .about-split-img { height: 220px; min-height: 0; object-position: center 25%; }
+  .about-split .about-cards { grid-template-columns: minmax(0, 1fr); }
+}

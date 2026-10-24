@@ -92,3 +92,17 @@ test('the About and login pages have the animated monitoring backdrop behind the
     await expect(bg).toHaveCSS('pointer-events', 'none') // never blocks clicks
   }
 })
+
+test('About navigation links glide to their section instead of jumping', async ({ page }) => {
+  await page.goto('/about')
+  await expect(page.getByTestId('about-cta')).toBeAttached()
+  // record every scroll position on the way: a glide passes through many, a jump only one
+  await page.evaluate(() => {
+    window.__steps = []
+    window.addEventListener('scroll', () => window.__steps.push(window.scrollY), { passive: true })
+  })
+  await page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Hardware' }).click()
+  await expect.poll(() => page.locator('#hardware').evaluate((el) => Math.abs(el.getBoundingClientRect().top)), { timeout: 5000 }).toBeLessThan(40)
+  const steps = await page.evaluate(() => new Set(window.__steps.map(Math.round)).size)
+  expect(steps).toBeGreaterThan(4)
+})

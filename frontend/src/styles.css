@@ -1231,3 +1231,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); opacity: 1; }
 .auth-page, .about-page { position: relative; isolation: isolate; }
 .shm-backdrop { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; opacity: .9; }
 @media (max-width: 760px) { .auth-page .shm-backdrop { display: none; } /* the phone form covers the screen */ }
+
+/* About page (and the user dashboard's section links): glide to a section instead of jumping */
+html:has(.about-page), html:has(.ud) { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html:has(.about-page), html:has(.ud) { scroll-behavior: auto; } }
